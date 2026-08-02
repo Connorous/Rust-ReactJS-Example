@@ -1,0 +1,332 @@
+button.edit-elements {
+  padding-bottom: 0.25%;
+  padding-top: 0.25%;
+  padding-right: 0.5%;
+  padding-left: 0.5%;
+  border-radius: 5px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+  width: 7%;
+  margin-left: 1%;
+  margin-bottom: 2%;
+}
+
+button.edit-elements > svg {
+  width: 30%;
+  height: 30%;
+  fill: white;
+  transition: 0.25s;
+  stroke-width: 0;
+  transition: fill 0s;
+}
+
+button.edit-elements:hover {
+  background-color: white;
+  transition: 0.25s;
+}
+
+button.edit-elements:hover > svg {
+  width: 30%;
+  height: 30%;
+  fill: #2a7680;
+  transition: 0.25s;
+  stroke-width: 0;
+  transition: fill 0s;
+}
+
+select.elements-change-type {
+  font-size: x-large;
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  width: 100%;
+}
+
+input.elements-content {
+  font-size: larger;
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: 1px solid black;
+  height: 50%;
+}
+
+textarea.elements-content {
+  font-size: larger;
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: 1px solid black;
+  height: 100%;
+  width: 100%;
+  resize: vertical;
+  background-image: linear-gradient(transparent, transparent 31px, white 31px);
+  background-size: 100% 32px;
+  line-height: 31px;
+  background-attachment: local;
+}
+
+input.elements-link {
+  font-size: larger;
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: 1px solid black;
+}
+
+input.elements-css {
+  font-size: larger;
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: 1px solid black;
+}
+
+div.elements-save-or-discard {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 5%;
+  margin-right: 5%;
+}
+
+button.elements-save {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 5px;
+  font-size: large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: brown;
+  outline: none;
+  background-color: brown;
+  color: white;
+  transition: 0.25s;
+}
+
+button.elements-save:hover {
+  background-color: white;
+  color: brown;
+  transition: 0.25s;
+}
+
+button.elements-discard {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 15px;
+  font-size: large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #636363;
+  outline: none;
+  background-color: #e6e6e6;
+  color: #636363;
+  transition: 0.25s;
+}
+
+button.elements-discard:hover {
+  background-color: #571212;
+  border-color: #571212;
+  color: white;
+  transition: 0.25s;
+}
+
+p.elements-error {
+  color: red;
+  margin-left: 2%;
+}
+
+button.elements-del {
+  text-align: left;
+  padding-bottom: 0.25%;
+  padding-top: 0.25%;
+  padding-right: 0.5%;
+  padding-left: 0.5%;
+  border-radius: 15px;
+  font-size: x-large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #636363;
+  outline: none;
+  background-color: #e6e6e6;
+  color: #636363;
+  transition: 0.25s;
+  width: 10%;
+  text-align: center;
+  margin-left: 85%;
+}
+
+button.elements-del > svg {
+  width: 20%;
+  height: 20%;
+  fill: #e6e6e6;
+  stroke: black;
+  transition: 0.25s;
+  stroke-width: 0;
+  transition: fill 0s;
+}
+
+button.elements-del:hover {
+  background-color: #571212;
+  border-color: #571212;
+  color: white;
+  transition: 0.25s;
+}
+
+button.elements-del:hover > svg {
+  fill: #571212;
+  stroke: #e6e6e6;
+  transition: 0.25s;
+  transition: fill 0s;
+  stroke-width: 0;
+}
+
+button.elements-add {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 5px;
+  font-size: x-large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+  margin-left: 1%;
+}
+
+button.elements-add:hover {
+  background-color: white;
+  color: #2a7680;
+  transition: 0.25s;
+}
+
+div.elements-up-or-down {
+  display: flex;
+  justify-content: flex-start;
+  margin-left: 2.5%;
+  margin-right: 2.5%;
+  flex-grow: 1;
+}
+
+svg.elements-up-down {
+  width: 100%;
+  height: 100%;
+  paint-order: stroke;
+  fill: none;
+  fill-rule: evenodd;
+  stroke: #595959;
+  stroke-width: 1.5;
+  transition:
+    fill 0.25s,
+    stroke 0.25s;
+  cursor: pointer;
+}
+
+svg.elements-up-down:hover path:first-of-type {
+  fill: #ededed;
+  fill-rule: evenodd;
+  stroke: #595959;
+  stroke-width: 1.5;
+}
+
+svg.elements-up-down:hover path:last-of-type {
+  fill: none !important;
+  fill-rule: evenodd;
+  stroke: #595959;
+  stroke-width: 1.5;
+}
+
+button.elements-save {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 15px;
+  font-size: large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+}
+
+button.elements-save:hover {
+  background-color: white;
+  color: #2a7680;
+  transition: 0.25s;
+}
+
+div.page-element-editing {
+  max-width: 95%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: white;
+  padding-bottom: 1%;
+  padding-top: 1%;
+  padding-right: 1%;
+  padding-left: 1%;
+  border-radius: 15px;
+  border: solid #363636;
+}
+
+div.page-element > pre > code {
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+div.editing-page-elements {
+  display: flex;
+  flex-direction: column;
+  margin-left: 5%;
+  gap: 20px;
+}
+
+div.elements-editor {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+div.elements-inputs {
+  display: flex;
+  flex-direction: column;
+  margin-left: 2.5%;
+  gap: 20px;
+  flex-grow: 1;
+  width: 80%;
+}
+
+div.page-elements {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}

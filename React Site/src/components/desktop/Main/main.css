@@ -1,0 +1,248 @@
+div.navbar {
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  align-items: stretch;
+  align-content: stretch;
+  width: 15%;
+  min-width: 15%;
+  max-width: 15%;
+  padding-left: 1%;
+  padding-right: 1%;
+  padding-top: 2%;
+  padding-bottom: 2%;
+  background-color: #e8e8d1;
+  margin: 0;
+  min-height: 100vh;
+  flex-grow: 2;
+  border-right: solid #c7c7b3 5px;
+  border-left: none;
+  border-bottom: none;
+  border-top: none;
+}
+
+div.nav-item-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  padding-left: 1%;
+  padding-right: 1%;
+  padding-top: 2%;
+  padding-bottom: 2%;
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-content: stretch;
+  align-items: stretch;
+  gap: 8px;
+  text-align: start;
+}
+
+a.nav {
+  text-align: left;
+  font-size: large;
+  outline: none;
+  color: #8c8c8c;
+  transition: 0.25s;
+  text-decoration: underline;
+  margin-left: 2%;
+}
+
+a.nav:hover {
+  color: #636363;
+  transition: 0.25s;
+}
+
+h2.nav {
+  color: #636363;
+  text-decoration: underline;
+  margin-left: 0.5%;
+}
+
+button.logout {
+  border-radius: 10px;
+  padding-top: 0.5%;
+  padding-bottom: 0.5%;
+  padding-right: 0.5%;
+  padding-left: 0.5%;
+  font-size: medium;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #636363;
+  outline: none;
+  background-color: white;
+  color: #636363;
+  transition: 0.25s;
+  width: 7%;
+  height: 30%;
+  text-align: center;
+  align-self: center;
+}
+
+button.logout:hover {
+  background-color: #363636;
+  border-color: #363636;
+  color: white;
+  transition: 0.25s;
+}
+
+div.top-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding-left: 5%;
+  padding-right: 5%;
+  background-color: #00999e;
+  border-bottom: solid #ededed 5px;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+
+div.top-bar-details {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-content: end;
+  align-items: end;
+  gap: 30px;
+}
+
+button.close {
+  padding-bottom: 0.75%;
+  padding-top: 0.75%;
+  padding-right: 1%;
+  padding-left: 1%;
+  border-radius: 5px;
+  font-size: large;
+  border-width: 2px;
+  border-style: none;
+  border-color: none;
+  outline: none;
+  background-color: #636363;
+  color: #fffff7;
+  transition: 0.25s;
+  height: 25px;
+  min-height: 25px;
+  align-self: flex-start;
+  width: 30%;
+}
+
+button.close:hover {
+  background-color: #fffff7;
+  color: black;
+  transition: 0.25s;
+}
+
+div.nav-bar-hidden {
+  display: flex;
+  justify-content: stretch;
+  align-items: stretch;
+  justify-items: center;
+  width: 5%;
+  max-width: 6%;
+  height: 100%;
+  min-height: 100vh;
+  background-color: #e8e8d1;
+  border-right: solid #c7c7b3 5px;
+  border-left: none;
+  border-bottom: none;
+  border-top: none;
+  flex-grow: 1;
+  flex-direction: column;
+  margin: 0;
+}
+
+button.open {
+  padding-bottom: 1%;
+  padding-top: 1%;
+  padding-right: 1.25%;
+  padding-left: 1.25%;
+  border-radius: 5px;
+  font-size: large;
+  border-width: 2px;
+  border-style: none;
+  outline: none;
+  margin: 0;
+  margin-top: 30%;
+  margin-left: 20%;
+  background-color: #636363;
+  color: #e8e8d1;
+  transition: 0.25s;
+  height: 10%;
+  width: 50%;
+  padding-bottom: 2%;
+}
+
+button.open:hover {
+  background-color: #fffff7;
+  color: black;
+  transition: 0.25s;
+}
+
+div.home {
+  min-height: 100vh;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-content: center;
+  align-self: center;
+  justify-self: center;
+  background-color: #fffff7;
+}
+
+div.home > h1 {
+  text-align: center;
+  align-self: center;
+  color: #2a7680;
+  font-size: 120px;
+  line-height: 0.1;
+}
+
+div.home > h3 {
+  text-align: center;
+  align-self: center;
+  color: #363636;
+  font-size: xx-large;
+}
+
+div.home > h3 > span {
+  color: #363636;
+  font-size: small;
+}
+
+div.home > p {
+  text-align: left;
+  align-self: center;
+  color: #363636;
+  font-size: x-large;
+  margin-left: 5%;
+}
+
+div.blocked {
+  min-height: 100vh;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-content: center;
+  align-self: center;
+  justify-self: center;
+  background-color: #fffff7;
+}
+
+div.blocked > h1 {
+  text-align: center;
+  align-self: center;
+  color: #2a7680;
+}
+
+div.blocked > p {
+  text-align: center;
+  align-self: center;
+  color: black;
+  font-size: x-large;
+}

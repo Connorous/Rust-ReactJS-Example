@@ -1,0 +1,38 @@
+#root {
+  min-width: 0px;
+  margin: 0;
+  padding: 0rem;
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-height: 100vh;
+  background-color: #fffff7;
+}
+
+div.mobile-mainpage {
+  display: flex;
+  flex-direction: row;
+  justify-content: stretch;
+  background-color: #fffff7;
+  height: 100%;
+  width: 100%;
+  margin-left: 5%;
+  color: black;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+div.mobile-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  max-width: 100%;
+  min-width: 100%;
+  height: 100%;
+  background-color: #fffff7;
+  flex-grow: 1;
+}
+
+html {
+  scrollbar-color: #f2f2f2 #636363;
+}

@@ -1,0 +1,154 @@
+h1.mobile-login-title {
+  font-size: 25px;
+  text-align: start;
+  margin-left: 5%;
+  color: black;
+}
+
+div.mobile-login-page {
+  display: flex;
+  flex-direction: row;
+  justify-content: stretch;
+}
+
+div.mobile-login-background {
+  max-width: 10%;
+  background-color: #2a7680;
+  min-height: 100vh;
+  flex-grow: 1;
+  max-height: 100%;
+  max-height: 100%;
+}
+
+div.mobile-login-form {
+  min-width: 50%;
+  max-width: 90%;
+  min-height: 100vh;
+  max-height: 100%;
+  background-color: #fffff7;
+  flex-grow: 1;
+}
+
+div.mobile-signin-grid {
+  display: grid;
+  grid-template-columns: 30% 60%;
+  grid-template-rows: auto;
+  justify-content: stretch;
+  gap: 5%;
+  margin: auto;
+  margin-left: 5%;
+  font-size: large;
+  align-items: center;
+}
+
+div.mobile-signin-grid > input {
+  font-size: medium;
+  padding-top: 1%;
+  padding-bottom: 1%;
+  padding-right: 1%;
+  padding-left: 1%;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  background-color: #fffff7;
+}
+
+div.mobile-signin-grid > input:focus {
+  outline: none;
+}
+
+div.mobile-signin-grid > label {
+  padding-right: 0%;
+  padding-left: 0%;
+  text-align: start;
+  display: inline-block;
+  font-size: medium;
+  color: black;
+}
+
+span.mobile-login-field-error {
+  color: red;
+  font-size: '12px';
+  text-align: start;
+  margin-left: 3%;
+}
+
+p.mobile-login-inform {
+  margin: auto;
+  margin-left: 5%;
+  text-align: start;
+  font-size: medium;
+  color: black;
+}
+
+a.mobile-login-inform {
+  margin: auto;
+  margin-left: 5%;
+  text-align: left;
+  font-size: medium;
+  color: #636363;
+  font-weight: 400;
+  text-wrap: initial;
+  display: block;
+}
+
+a.mobile-login-inform:hover {
+  color: #363636;
+}
+
+p.mobile-login-error {
+  color: red;
+  font-size: medium;
+  text-align: start;
+  margin-left: 5%;
+}
+
+button.mobile-login-submit {
+  text-align: left;
+  margin: auto;
+  margin-left: 5%;
+  padding-bottom: 2%;
+  padding-top: 2%;
+  padding-right: 8%;
+  padding-left: 8%;
+  border-radius: 10px;
+  font-size: large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+}
+
+button.mobile-login-submit:hover {
+  background-color: white;
+  color: #2a7680;
+  transition: 0.25s;
+}
+
+button.mobile-login-switch {
+  text-align: left;
+  margin: auto;
+  margin-left: 5%;
+  margin-right: 10%;
+  padding-bottom: 2%;
+  padding-top: 2%;
+  padding-right: 8%;
+  padding-left: 8%;
+  border-radius: 10px;
+  font-size: large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #363636;
+  outline: none;
+  background-color: white;
+  color: #363636;
+  transition: 0.25s;
+}
+
+button.mobile-login-switch:hover {
+  background-color: #ededed;
+  transition: 0.25s;
+}

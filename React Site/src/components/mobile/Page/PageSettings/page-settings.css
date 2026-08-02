@@ -1,0 +1,549 @@
+div.mobile-page-settings {
+  background-color: white;
+  color: black;
+  border: solid #363636 5px;
+  border-radius: 5px;
+  padding-bottom: 0.25%;
+  padding-top: 0.25%;
+  padding-right: 1%;
+  padding-left: 1%;
+  width: 90%;
+  z-index: 2;
+  margin-left: 3%;
+  position: absolute;
+  top: 20px;
+  max-height: 95%;
+  max-width: 90%;
+  overflow: scroll;
+  overflow-x: hidden;
+}
+
+h3.mobile-page-settings {
+  text-align: center;
+  margin: 0;
+  font-size: x-large;
+}
+
+h3.mobile-section-title {
+  margin: 0;
+  font-size: large;
+}
+
+div.mobile-page-settings-closed {
+  height: 5%;
+}
+
+button.mobile-settings {
+  text-align: right;
+  padding-bottom: 0.125%;
+  padding-top: 0.125%;
+  padding-right: 0.25%;
+  padding-left: 0.25%;
+  border-radius: 5px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #363636;
+  outline: none;
+  background-color: white;
+  color: white;
+  stroke: #363636;
+  transition: 0.5s;
+  margin-top: 1%;
+  margin-bottom: 1%;
+  display: flex;
+  justify-content: center;
+  align-content: center;
+}
+
+button.mobile-settings > svg {
+  width: 60%;
+  height: 60%;
+  stroke-width: 0;
+  transition: fill 0s;
+  align-self: center;
+}
+
+button.mobile-settings:hover {
+  background-color: #363636;
+  color: #363636;
+  stroke: white;
+  transition: 0.25s;
+}
+
+button.mobile-settings-close {
+  text-align: right;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 1%;
+  padding-left: 1%;
+  border-radius: 5px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #363636;
+  outline: none;
+  background-color: #363636;
+  color: white;
+  transition: 0.25s;
+  height: 5%;
+  text-align: center;
+  margin-left: 94%;
+  margin-top: 1%;
+  align-content: center;
+}
+
+button.mobile-settings-close:hover {
+  background-color: white;
+  color: black;
+  transition: 0.25s;
+}
+
+div.mobile-page-details {
+  background-color: white;
+  color: black;
+  display: grid;
+  grid-template-columns: 50% 50%;
+  border-radius: 5px;
+  align-items: center;
+}
+
+div.mobile-page-details > p {
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  max-width: 90%;
+  margin-left: 2%;
+  margin-right: 2%;
+  background-color: #e6e6e6;
+  border-bottom: solid #636363;
+  font-size: small;
+}
+
+div.mobile-page-details > button {
+  margin-left: 2%;
+  margin-right: 2%;
+}
+
+div.mobile-page-details > p {
+  font-size: small;
+}
+
+div.mobile-page-details > p > span {
+  font-weight: bold;
+}
+
+div.mobile-page-detailszz {
+  background-color: white;
+  color: black;
+  display: grid;
+  grid-template-columns: 50% 50%;
+  border-radius: 5px;
+}
+
+button.mobile-edit-page-details {
+  padding-bottom: 0.25%;
+  padding-top: 0.25%;
+  padding-right: 0.5%;
+  padding-left: 0.5%;
+  border-radius: 5px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+  width: 15%;
+  align-self: center;
+}
+
+button.mobile-edit-page-details > svg {
+  width: 20%;
+  height: 20%;
+  fill: white;
+  transition: 0.25s;
+  stroke-width: 0;
+  transition: fill 0s;
+}
+
+button.mobile-edit-page-details:hover {
+  background-color: white;
+  transition: 0.25s;
+}
+
+button.mobile-edit-page-details:hover > svg {
+  fill: #2a7680;
+  transition: 0.25s;
+  stroke-width: 0;
+  transition: fill 0s;
+}
+
+input.mobile-edit-title {
+  font-size: small;
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: 1px solid black;
+}
+
+input.mobile-edit-published {
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: 1px solid black;
+}
+
+input.mobile-edit-published:checked {
+  accent-color: #00999e;
+}
+
+select.mobile-edit-select-sheet {
+  font-size: small;
+  background-color: #f2f2f2;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+}
+
+select.mobile-edit-select-sheet:focus {
+  background-color: #ededed;
+}
+
+button.mobile-edit-page-details:hover {
+  background-color: white;
+  transition: 0.5s;
+}
+
+div.mobile-edit-page-details {
+  display: grid;
+  grid-template-columns: 35% 65%;
+  border-radius: 15px;
+  background-color: #e6e6e6;
+  margin-left: 5%;
+  margin-right: 5%;
+}
+
+div.mobile-edit-page-details > p {
+  font-size: small;
+  padding-bottom: 2%;
+  padding-top: 2%;
+  padding-right: 5%;
+  padding-left: 5%;
+  row-gap: 0;
+  gap: 0;
+  margin: 0;
+  color: black;
+  font-weight: bold;
+}
+
+div.mobile-edit-page-details > input {
+  font-size: small;
+}
+
+div.mobile-edit-window {
+  background-color: white;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+div.mobile-page-details--save-or-discard {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 5%;
+  margin-right: 5%;
+}
+
+button.mobile-settings-save {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 15px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+}
+
+button.mobile-settings-save:hover {
+  background-color: white;
+  color: #2a7680;
+  transition: 0.25s;
+}
+
+button.mobile-settings-discard {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 15px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #636363;
+  outline: none;
+  background-color: #e6e6e6;
+  color: #636363;
+  transition: 0.25s;
+}
+
+button.mobile-settings-discard:hover {
+  background-color: #571212;
+  border-color: #571212;
+  color: white;
+  transition: 0.25s;
+}
+
+p.mobile-settings-error {
+  color: red;
+}
+
+div.mobile-settings-update-or-delete {
+  display: flex;
+  justify-content: flex-start;
+  gap: 30px;
+  margin-left: 5%;
+  margin-right: 5%;
+}
+
+button.mobile-settings-update {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 10px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+}
+
+button.mobile-settings-update:hover {
+  background-color: white;
+  color: #2a7680;
+  transition: 0.25s;
+}
+
+button.mobile-settings-del {
+  text-align: left;
+  padding-bottom: 0.25%;
+  padding-top: 0.25%;
+  padding-right: 0.5%;
+  padding-left: 0.5%;
+  border-radius: 15px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #636363;
+  outline: none;
+  background-color: #e6e6e6;
+  color: #636363;
+  transition: 0.25s;
+  width: 15%;
+  text-align: center;
+  align-self: center;
+  align-content: center;
+  justify-content: center;
+}
+
+button.mobile-settings-del > svg {
+  width: 25%;
+  height: 25%;
+  fill: #e6e6e6;
+  stroke: black;
+  transition: 0.25s;
+  stroke-width: 0;
+  transition: fill 0s;
+  align-self: center;
+}
+
+button.mobile-settings-del:hover {
+  background-color: #571212;
+  border-color: #571212;
+  color: white;
+  transition: 0.25s;
+}
+
+button.mobile-settings-del:hover > svg {
+  fill: #571212;
+  stroke: #e6e6e6;
+  transition: 0.25s;
+  transition: fill 0s;
+  stroke-width: 0;
+}
+
+button.mobile-settings-add {
+  text-align: left;
+  padding-bottom: 0.5%;
+  padding-top: 0.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 5px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+  margin-left: 1%;
+}
+
+button.mobile-settings-add:hover {
+  background-color: white;
+  color: #2a7680;
+  transition: 0.25s;
+}
+
+div.mobile-settings-table-window {
+  background-color: white;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+table.mobile-permissions-table {
+  width: 95%;
+  border-radius: 10px;
+  border-collapse: separate; /* Required for border-radius */
+  border-spacing: 0; /* Removes gaps between cells */
+  overflow: hidden;
+  text-align: left;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: small;
+}
+
+table.mobile-permissions-table > thead {
+  color: white;
+  background-color: #4d8d8f;
+  border-radius: 5px;
+}
+
+table.mobile-permissions-table > thead > tr > th {
+  padding-left: 1%;
+  padding-right: 1%;
+}
+
+table.mobile-permissions-table > tbody {
+  color: black;
+}
+
+table.mobile-permissions-table > tbody > tr > td {
+  padding-left: 1%;
+  padding-right: 1%;
+  padding-top: 0.5%;
+  padding-bottom: 0.5%;
+}
+
+table.mobile-permissions-table > tbody > tr:nth-child(odd) {
+  background-color: white;
+  transition: 0.5s;
+}
+
+table.mobile-permissions-table > tbody > tr:nth-child(even) {
+  background-color: gainsboro;
+  transition: 0.5s;
+}
+
+p.mobile-tip {
+  color: black;
+  margin-left: 4%;
+  font-size: xx-small;
+}
+
+div.mobile-settings-section {
+  border: solid #363636;
+  border-bottom: none;
+  border-right: none;
+  border-left: none;
+}
+
+div.mobile-page-details-edit-or-delete {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+div.mobile-page-details-save-or-discard {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 5%;
+  margin-right: 5%;
+}
+
+button.mobile-settings-del2 {
+  text-align: left;
+  padding-bottom: 0.25%;
+  padding-top: 0.25%;
+  padding-right: 0.5%;
+  padding-left: 0.5%;
+  border-radius: 15px;
+  font-size: small;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #636363;
+  outline: none;
+  background-color: #e6e6e6;
+  color: #636363;
+  transition: 0.25s;
+  width: 100%;
+  text-align: center;
+  align-self: center;
+}
+
+button.mobile-settings-del2 > svg {
+  width: 25%;
+  height: 25%;
+  fill: #e6e6e6;
+  stroke: black;
+  transition: 0.25s;
+  stroke-width: 0;
+  transition: fill 0s;
+  align-self: center;
+}
+
+button.mobile-settings-del2:hover {
+  background-color: #571212;
+  border-color: #571212;
+  color: white;
+  transition: 0.25s;
+}
+
+button.mobile-settings-del2:hover > svg {
+  fill: #571212;
+  stroke: #e6e6e6;
+  transition: 0.25s;
+  transition: fill 0s;
+  stroke-width: 0;
+}
+
+textarea.mobile-edit-css {
+  resize: vertical;
+  background-image: linear-gradient(
+    transparent,
+    transparent 21px,
+    #f2f2f2 21px
+  );
+  background-size: 100% 22px;
+  line-height: 21px;
+  background-attachment: local;
+  font-size: xx-small;
+}

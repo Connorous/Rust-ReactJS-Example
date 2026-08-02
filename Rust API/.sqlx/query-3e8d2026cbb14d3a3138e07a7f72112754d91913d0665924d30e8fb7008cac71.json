@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, user_id, page_id, permission_type_id FROM page_permissions WHERE user_id = $1 AND page_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "page_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "permission_type_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3e8d2026cbb14d3a3138e07a7f72112754d91913d0665924d30e8fb7008cac71"
+}

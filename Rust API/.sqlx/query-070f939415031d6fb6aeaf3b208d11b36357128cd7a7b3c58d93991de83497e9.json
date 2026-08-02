@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, page_id, sheet_name, css, created_by_id FROM page_css WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "page_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "sheet_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "css",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_by_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "070f939415031d6fb6aeaf3b208d11b36357128cd7a7b3c58d93991de83497e9"
+}

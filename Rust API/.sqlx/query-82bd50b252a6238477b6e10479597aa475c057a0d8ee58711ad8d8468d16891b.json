@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE pages SET selected_css_id = $1 WHERE created_by_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "82bd50b252a6238477b6e10479597aa475c057a0d8ee58711ad8d8468d16891b"
+}

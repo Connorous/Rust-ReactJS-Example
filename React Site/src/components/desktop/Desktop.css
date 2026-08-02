@@ -1,0 +1,36 @@
+#root {
+  min-width: 850px;
+  margin: 0;
+  padding: 0rem;
+  flex-grow: 1;
+  flex-shrink: 1;
+  max-width: 100vw;
+  min-height: 100vh;
+}
+
+div.mainpage {
+  display: flex;
+  flex-direction: row;
+  justify-content: stretch;
+  background-color: #fffff7;
+  height: 100%;
+  width: 100%;
+  color: black;
+  margin: 0;
+  padding: 0;
+}
+
+div.page {
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  max-width: 100%;
+  min-width: 80%;
+  height: 100%;
+  flex-grow: 2;
+  background-color: #fffff7;
+}
+
+html {
+  scrollbar-color: #f2f2f2 #636363;
+}

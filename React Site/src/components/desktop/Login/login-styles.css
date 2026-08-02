@@ -1,0 +1,155 @@
+h1.login-title {
+  size: 40px;
+  text-align: start;
+  margin-left: 5%;
+  margin-right: 10%;
+  color: black;
+}
+
+div.login-page {
+  display: flex;
+  flex-direction: row;
+  justify-content: stretch;
+}
+
+div.login-background {
+  min-width: 50%;
+  background-color: #2a7680;
+  min-height: 100vh;
+}
+
+div.login-form {
+  min-width: 50%;
+  min-height: 100vh;
+  background-color: #fffff7;
+}
+
+div.signin-grid {
+  display: grid;
+  grid-template-columns: 30% 70%;
+  grid-template-rows: auto;
+  justify-content: stretch;
+  gap: 2%;
+  margin: auto;
+  margin-left: 5%;
+  margin-right: 10%;
+  font-size: large;
+  align-items: center;
+}
+
+div.signin-grid > input {
+  font-size: x-large;
+  padding-top: 1%;
+  padding-bottom: 1%;
+  padding-right: 1%;
+  padding-left: 1%;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  background-color: #fffff7;
+}
+
+div.signin-grid > input:focus {
+  outline: none;
+}
+
+div.signin-grid > label {
+  padding-right: 0%;
+  padding-left: 0%;
+  text-align: start;
+  display: inline-block;
+  font-size: x-large;
+  color: black;
+}
+
+span.login-field-error {
+  color: red;
+  font-size: '12px';
+  text-align: start;
+  padding-left: 32.5%;
+}
+
+p.login-inform {
+  margin: auto;
+  margin-left: 5%;
+  margin-right: 10%;
+  text-align: start;
+  font-size: large;
+  color: black;
+}
+
+a.login-inform {
+  margin: auto;
+  margin-left: 5%;
+  margin-right: 10%;
+  text-align: start;
+  font-size: large;
+  color: #636363;
+  font-weight: 400;
+}
+
+a.login-inform:hover {
+  color: #363636;
+}
+
+p.login-error {
+  color: red;
+  font-size: '12px';
+  text-align: start;
+  margin-left: 5%;
+  margin-right: 10%;
+  margin: auto;
+  margin-left: 5%;
+  margin-right: 10%;
+}
+
+button.login-submit {
+  text-align: left;
+  margin: auto;
+  margin-left: 5%;
+  margin-right: 10%;
+  padding-bottom: 1.5%;
+  padding-top: 1.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 10px;
+  font-size: x-large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #2a7680;
+  outline: none;
+  background-color: #2a7680;
+  color: white;
+  transition: 0.25s;
+}
+
+button.login-submit:hover {
+  background-color: white;
+  color: #2a7680;
+  transition: 0.25s;
+}
+
+button.login-switch {
+  text-align: left;
+  margin: auto;
+  margin-left: 5%;
+  margin-right: 10%;
+  padding-bottom: 1.5%;
+  padding-top: 1.5%;
+  padding-right: 4%;
+  padding-left: 4%;
+  border-radius: 10px;
+  font-size: x-large;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #363636;
+  outline: none;
+  background-color: white;
+  color: #363636;
+  transition: 0.25s;
+}
+
+button.login-switch:hover {
+  background-color: #ededed;
+  transition: 0.25s;
+}
