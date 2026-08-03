@@ -131,9 +131,9 @@ CREATE TABLE messages (
 
 -- SEED DATA
 
-INSERT INTO user_types (name) VALUES ('super_admin'), ('admin'), ('standard_user'), ('viewer'), ('blocked');
-INSERT INTO account_statuses (name) VALUES ('active'), ('suspended'), ('closed');
-INSERT INTO user_statuses (name) VALUES ('online'), ('idle'), ('do_not_disturb'), ('offline');
-INSERT INTO themes (name) VALUES ('default'), ('rounded'), ('compact'), ('mono');
-INSERT INTO relationship_statuses (name) VALUES ('pending'), ('accepted'), ('blocked');
-INSERT INTO chat_group_permission_types (name) VALUES ('moderator'), ('member'), ('viewer'), ('blocked');
+INSERT INTO user_types (type) VALUES ('Supreme Administrator'), ('Admin'), ('Standard User'), ('Viewer'), ('Blocked');
+INSERT INTO account_statuses (status) VALUES ('Active'), ('Suspended'), ('Closed');
+INSERT INTO user_statuses (status) VALUES ('Online'), ('Idle'), ('Do Not Disturb'), ('Offline');
+INSERT INTO themes (theme) VALUES ('Default'), ('Rounded'), ('Sharp'), ('Gothic'), ('Times Roman');
+INSERT INTO relationship_statuses (status) VALUES ('Pending'), ('Accepted'), ('Blocked');
+INSERT INTO chat_group_permission_types (permission_type) VALUES ('Moderator'), ('Member'), ('Viewer'), ('Blocked');
