@@ -2,12 +2,14 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use log::info;
 use std::fmt;
-mod routes;
-mod state;
-use sqlx::postgres::PgPoolOptions;
-use std::env;
 mod auth;
 mod controllers;
+mod extractors;
+mod routes;
+mod state;
+use dotenvy::dotenv;
+use sqlx::postgres::PgPoolOptions;
+use std::env;
 
 // ApiError covers all error cases the API can return
 #[derive(Debug)]
@@ -49,39 +51,34 @@ impl ResponseError for ApiError {
 
 // Configure CORS for the application
 fn configure_cors() -> Cors {
+    let frontend_url = env::var("FRONTEND_URL").unwrap();
+
     Cors::default()
-        // Allow requests from your frontend origin
-        .allowed_origin("https://page-creator-frontend.fly.dev")
-        // Allow common HTTP methods
+        .allowed_origin(&frontend_url)
         .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-        // Allow JSON content type header
         .allowed_headers(vec!["Content-Type", "Authorization"])
-        // Cache preflight responses for one hour
+        .supports_credentials() // required for httpOnly cookies
         .max_age(3600)
 }
 
-#[allow(non_snake_case)]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Initialize the logger from the RUST_LOG environment variable
     env_logger::init();
     // Create shared application state
+    dotenv().ok();
 
-    dotenv::dotenv().ok();
-
-    let PgUser = env::var("PgUser").unwrap();
-    let PgPassword = std::env::var("PgPassword").unwrap();
-    let PgIp = std::env::var("PgIp").unwrap();
-    let PgPort = std::env::var("PgPort").unwrap();
-    let PgDatabase = std::env::var("PgDatabase").unwrap();
+    let pg_user = env::var("PgUser").expect("PgUser must be set");
+    let pg_password = env::var("PgPassword").expect("PgPassword must be set");
+    let pg_ip = env::var("PgIp").expect("PgIp must be set");
+    let pg_port = env::var("PgPort").expect("PgPort must be set");
+    let pg_database = env::var("PgDatabase").expect("PgDatabase must be set");
 
     let database_url = format!(
         "postgresql://{}:{}@{}:{}/{}",
-        PgUser, PgPassword, PgIp, PgPort, PgDatabase
+        pg_user, pg_password, pg_ip, pg_port, pg_database
     );
-    //let database_connection_url: String = (database_url).expect("DATABASE_URL must be set");
 
-    // Create a connection pool
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(std::time::Duration::from_secs(3))
@@ -89,27 +86,26 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to create pool");
 
-    let data = web::Data::new(state::AppState { db: pool });
+    let connections: UserConnections = Arc::new(RwLock::new(HashMap::new()));
 
-    info!("Starting server on 0.0.0.0");
-    // Build and start the HTTP server
+    let data = web::Data::new(state::AppState {
+        db: pool,
+        connections,
+    });
+
+    info!("Starting server on 0.0.0.0:8080");
+
     HttpServer::new(move || {
         App::new()
-            // Attach shared state to the application
-            // Add logging middleware for every request
             .app_data(data.clone())
             .wrap(middleware::Logger::default())
-            //configure routes
-            .configure(routes::configure_login_user_routes)
-            .configure(routes::configure_user_routes)
-            .configure(routes::configure_page_routes)
-            .configure(routes::configure_page_element_routes)
-            .configure(routes::configure_page_permission_routes)
-            .configure(routes::configure_page_css_routes)
             .wrap(configure_cors())
+            .configure(routes::configure_login_routes)
+            .configure(routes::configure_user_routes)
+            .configure(routes::configure_chat_group_routes)
+            .configure(routes::configure_direct_message_routes)
     })
-    .bind("0.0.0.0:8080")
-    .unwrap()
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }
