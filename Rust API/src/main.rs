@@ -93,6 +93,13 @@ async fn main() -> std::io::Result<()> {
         connections,
     });
 
+    // Spawn PG LISTEN/NOTIFY listener as background task
+    let listener_pool = pool.clone();
+    let listener_connections = connections.clone();
+    tokio::spawn(async move {
+        listeners::pg_listener(listener_pool, listener_connections).await;
+    });
+
     info!("Starting server on 0.0.0.0:8080");
 
     HttpServer::new(move || {

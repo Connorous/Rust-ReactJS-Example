@@ -59,3 +59,42 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+// WebSocket push helpers
+pub async fn push_to_user(
+    connections: &UserConnections,
+    user_id: i64,
+    event: &str,
+    data: serde_json::Value,
+) {
+    let msg = serde_json::json!({
+        "event": event,
+        "data": data
+    })
+    .to_string();
+
+    let conns = connections.read().await;
+    if let Some(tx) = conns.get(&user_id) {
+        let _ = tx.send(msg);
+    }
+}
+
+pub async fn push_to_users(
+    connections: &UserConnections,
+    user_ids: Vec<i64>,
+    event: &str,
+    data: serde_json::Value,
+) {
+    let msg = serde_json::json!({
+        "event": event,
+        "data": data
+    })
+    .to_string();
+
+    let conns = connections.read().await;
+    for user_id in user_ids {
+        if let Some(tx) = conns.get(&user_id) {
+            let _ = tx.send(msg.clone());
+        }
+    }
+}

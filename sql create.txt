@@ -137,3 +137,201 @@ INSERT INTO user_statuses (status) VALUES ('Online'), ('Idle'), ('Do Not Disturb
 INSERT INTO themes (theme) VALUES ('Default'), ('Rounded'), ('Sharp'), ('Gothic'), ('Times Roman');
 INSERT INTO relationship_statuses (status) VALUES ('Pending'), ('Accepted'), ('Blocked');
 INSERT INTO chat_group_permission_types (permission_type) VALUES ('Moderator'), ('Member'), ('Viewer'), ('Blocked');
+
+
+-- TRIGGER FUNCTIONS
+
+-- MESSAGES
+
+CREATE OR REPLACE FUNCTION notify_message_created()
+RETURNS TRIGGER AS $$
+DECLARE
+    recipient_ids BIGINT[];
+BEGIN
+    IF NEW.relationship_id IS NOT NULL THEN
+        SELECT ARRAY[
+            CASE WHEN requester_id = NEW.sender_id THEN receiver_id ELSE requester_id END
+        ]
+        INTO recipient_ids
+        FROM user_relationships
+        WHERE id = NEW.relationship_id;
+    ELSIF NEW.group_id IS NOT NULL THEN
+        SELECT ARRAY_AGG(user_id)
+        INTO recipient_ids
+        FROM chat_group_permissions
+        WHERE group_id = NEW.group_id
+        AND permission_type_id != 4
+        AND user_id != NEW.sender_id;
+    END IF;
+
+    PERFORM pg_notify(
+        'message_created',
+        json_build_object(
+            'message_id', NEW.id,
+            'sender_id', NEW.sender_id,
+            'relationship_id', NEW.relationship_id,
+            'group_id', NEW.group_id,
+            'message', NEW.message,
+            'created_at', NEW.created_at,
+            'recipient_ids', recipient_ids
+        )::text
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER message_created_trigger
+AFTER INSERT ON messages
+FOR EACH ROW EXECUTE FUNCTION notify_message_created();
+
+CREATE OR REPLACE FUNCTION notify_message_updated()
+RETURNS TRIGGER AS $$
+DECLARE
+    recipient_ids BIGINT[];
+BEGIN
+    IF NEW.relationship_id IS NOT NULL THEN
+        SELECT ARRAY[
+            CASE WHEN requester_id = NEW.sender_id THEN receiver_id ELSE requester_id END
+        ]
+        INTO recipient_ids
+        FROM user_relationships
+        WHERE id = NEW.relationship_id;
+    ELSIF NEW.group_id IS NOT NULL THEN
+        SELECT ARRAY_AGG(user_id)
+        INTO recipient_ids
+        FROM chat_group_permissions
+        WHERE group_id = NEW.group_id
+        AND permission_type_id != 4
+        AND user_id != NEW.sender_id;
+    END IF;
+
+    PERFORM pg_notify(
+        'message_updated',
+        json_build_object(
+            'message_id', NEW.id,
+            'relationship_id', NEW.relationship_id,
+            'group_id', NEW.group_id,
+            'recipient_ids', recipient_ids
+        )::text
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER message_updated_trigger
+AFTER UPDATE ON messages
+FOR EACH ROW EXECUTE FUNCTION notify_message_updated();
+
+CREATE OR REPLACE FUNCTION notify_message_deleted()
+RETURNS TRIGGER AS $$
+DECLARE
+    recipient_ids BIGINT[];
+BEGIN
+    IF OLD.relationship_id IS NOT NULL THEN
+        SELECT ARRAY[
+            CASE WHEN requester_id = OLD.sender_id THEN receiver_id ELSE requester_id END
+        ]
+        INTO recipient_ids
+        FROM user_relationships
+        WHERE id = OLD.relationship_id;
+    ELSIF OLD.group_id IS NOT NULL THEN
+        SELECT ARRAY_AGG(user_id)
+        INTO recipient_ids
+        FROM chat_group_permissions
+        WHERE group_id = OLD.group_id
+        AND permission_type_id != 4
+        AND user_id != OLD.sender_id;
+    END IF;
+
+    PERFORM pg_notify(
+        'message_deleted',
+        json_build_object(
+            'message_id', OLD.id,
+            'relationship_id', OLD.relationship_id,
+            'group_id', OLD.group_id,
+            'recipient_ids', recipient_ids
+        )::text
+    );
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER message_deleted_trigger
+AFTER DELETE ON messages
+FOR EACH ROW EXECUTE FUNCTION notify_message_deleted();
+
+-- USERS
+
+CREATE OR REPLACE FUNCTION notify_user_updated()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM pg_notify(
+        'user_updated',
+        json_build_object(
+            'user_id', NEW.id,
+            'user_type_id', NEW.user_type_id,
+            'account_status_id', NEW.account_status_id,
+            'is_online', NEW.is_online,
+            'status_id', NEW.status_id
+        )::text
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_updated_trigger
+AFTER UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION notify_user_updated();
+
+CREATE OR REPLACE FUNCTION notify_user_suspended()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.account_status_id = 2 AND OLD.account_status_id != 2 THEN
+        PERFORM pg_notify(
+            'user_suspended',
+            json_build_object(
+                'user_id', NEW.id
+            )::text
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_suspended_trigger
+AFTER UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION notify_user_suspended();
+
+CREATE OR REPLACE FUNCTION notify_user_created()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM pg_notify(
+        'user_created',
+        json_build_object(
+            'user_id', NEW.id
+        )::text
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_created_trigger
+AFTER INSERT ON users
+FOR EACH ROW EXECUTE FUNCTION notify_user_created();
+
+CREATE OR REPLACE FUNCTION notify_user_deleted()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM pg_notify(
+        'user_deleted',
+        json_build_object(
+            'user_id', OLD.id
+        )::text
+    );
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_deleted_trigger
+AFTER DELETE ON users
+FOR EACH ROW EXECUTE FUNCTION notify_user_deleted();
