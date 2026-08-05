@@ -5,6 +5,7 @@ use std::fmt;
 mod auth;
 mod controllers;
 mod extractors;
+mod listeners;
 mod routes;
 mod state;
 use dotenvy::dotenv;
