@@ -1,7 +1,10 @@
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use log::info;
+use std::collections::HashMap;
 use std::fmt;
+use std::sync::Arc;
+use tokio::sync::{broadcast, RwLock};
 mod auth;
 mod controllers;
 mod extractors;
@@ -10,6 +13,7 @@ mod routes;
 mod state;
 use dotenvy::dotenv;
 use sqlx::postgres::PgPoolOptions;
+use state::UserConnections;
 use std::env;
 
 // ApiError covers all error cases the API can return

@@ -1,69 +1,104 @@
+use crate::auth::JwtClaims;
 use crate::controllers::user_controller;
+use crate::extractors::RequireGlobal;
 use crate::state::AppState;
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct NewUserRequestBody {
-    admin_id: i64,
-    username: String,
-    email: String,
-    name: String,
-    password: String,
-    user_type_id: i64,
-}
-
-#[derive(Deserialize, Clone)]
-pub struct UpdateUserRequestBody {
-    admin_id: i64,
-    id: i64,
-    username: String,
-    email: String,
-    name: String,
-    user_type_id: i64,
-    original_user_type: i64,
-}
-
-#[derive(Deserialize, Clone)]
-pub struct ResetPasswordUserRequestBody {
-    username: String,
-    email: String,
-    password: String,
-}
+// --- REQUEST BODIES ---
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct RegisterUserRequestBody {
-    username: String,
-    email: String,
-    name: String,
-    password: String,
+    pub username: String,
+    pub email: String,
+    pub name: String,
+    pub password: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct LoginUserRequestBody {
-    username: String,
-    password: String,
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct NewUserRequestBody {
+    pub username: String,
+    pub email: String,
+    pub name: String,
+    pub password: String,
+    pub user_type_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct UpdateUserRequestBody {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    pub name: String,
+    pub user_type_id: i64,
+    pub account_status_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct UpdateProfileRequestBody {
+    pub name: String,
+    pub bio_info: Option<String>,
+    pub theme_id: Option<i64>,
+    pub theme_dark_mode: bool,
+    pub light_theme_primary_colour: String,
+    pub light_theme_secondary_colour: String,
+    pub light_theme_accent_colour: String,
+    pub light_theme_sent_colour: String,
+    pub light_theme_received_colour: String,
+    pub light_theme_dark_text_colour: String,
+    pub light_theme_light_text_colour: String,
+    pub dark_theme_primary_colour: String,
+    pub dark_theme_secondary_colour: String,
+    pub dark_theme_accent_colour: String,
+    pub dark_theme_sent_colour: String,
+    pub dark_theme_received_colour: String,
+    pub dark_theme_dark_text_colour: String,
+    pub dark_theme_light_text_colour: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct UpdateStatusRequestBody {
+    pub status_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ResetPasswordRequestBody {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ChangePasswordRequestBody {
+    pub current_password: String,
+    pub new_password: String,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct DeleteUserRequestBody {
-    admin_id: i64,
-    id: i64,
+    pub id: i64,
 }
+
+// --- LOGIN ROUTES ---
 
 pub async fn register_user(
     data: web::Data<AppState>,
-    req: HttpRequest,
     json: web::Json<RegisterUserRequestBody>,
 ) -> HttpResponse {
-    let new_user_info = json.clone();
+    let body = json.clone();
 
     let result: HttpResponse = match user_controller::register_user(
         data,
-        new_user_info.username,
-        new_user_info.email,
-        new_user_info.name,
-        new_user_info.password,
+        body.username,
+        body.email,
+        body.name,
+        body.password,
     )
     .await
     {
@@ -76,71 +111,125 @@ pub async fn register_user(
 
 pub async fn login_user(
     data: web::Data<AppState>,
-    req: HttpRequest,
     json: web::Json<LoginUserRequestBody>,
 ) -> HttpResponse {
-    let new_user_info = json.clone();
+    let body = json.clone();
 
     let result: HttpResponse =
-        match user_controller::login_user(data, new_user_info.username, new_user_info.password)
+        match user_controller::login_user(data, body.username, body.password).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn refresh_token(data: web::Data<AppState>, req: HttpRequest) -> HttpResponse {
+    let result: HttpResponse = match user_controller::refresh_token(data, req).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn logout_user(
+    data: web::Data<AppState>,
+    claims: RequireGlobal<{ global::VIEWER }>,
+) -> HttpResponse {
+    let result: HttpResponse = match user_controller::logout_user(data, claims.0).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn reset_user_password(
+    data: web::Data<AppState>,
+    json: web::Json<ResetPasswordRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match user_controller::reset_user_password(data, body.username, body.email, body.password)
             .await
         {
             Ok(res) => res,
             Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
         };
-    result
-}
-
-pub async fn list_users(data: web::Data<AppState>, id: web::Path<i64>) -> HttpResponse {
-    let get_auth_user_id: i64 = id.into_inner();
-    let result: HttpResponse = match user_controller::list_users(data, get_auth_user_id).await {
-        Ok(res) => res,
-        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-    };
 
     result
 }
 
-pub async fn list_user_types(data: web::Data<AppState>, id: web::Path<i64>) -> HttpResponse {
-    let get_auth_user_id: i64 = id.into_inner();
-    let result: HttpResponse = match user_controller::list_user_types(data, get_auth_user_id).await
-    {
-        Ok(res) => res,
-        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-    };
+// --- USER ROUTES ---
 
-    result
-}
-
-/*pub async fn get_user(
+pub async fn list_users(
     data: web::Data<AppState>,
-    req: HttpRequest,
+    claims: RequireGlobal<{ global::ADMIN }>,
+) -> HttpResponse {
+    let result: HttpResponse = match user_controller::list_users(data, claims.0).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn list_user_types(
+    data: web::Data<AppState>,
+    claims: RequireGlobal<{ global::ADMIN }>,
+) -> HttpResponse {
+    let result: HttpResponse = match user_controller::list_user_types(data, claims.0).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn list_themes(
+    data: web::Data<AppState>,
+    claims: RequireGlobal<{ global::VIEWER }>,
+) -> HttpResponse {
+    let result: HttpResponse = match user_controller::list_themes(data, claims.0).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn get_user(
+    data: web::Data<AppState>,
+    claims: RequireGlobal<{ global::VIEWER }>,
     id: web::Path<i64>,
 ) -> HttpResponse {
-    let get_user_id: i64 = id.into_inner();
-    let result: HttpResponse = match user_controller::get_user(data, get_user_id).await {
+    let user_id: i64 = id.into_inner();
+
+    let result: HttpResponse = match user_controller::get_user(data, claims.0, user_id).await {
         Ok(res) => res,
         Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
     };
 
     result
-}*/
+}
 
 pub async fn new_user(
     data: web::Data<AppState>,
-    req: HttpRequest,
+    claims: RequireGlobal<{ global::ADMIN }>,
     json: web::Json<NewUserRequestBody>,
 ) -> HttpResponse {
-    let new_user_info = json.clone();
+    let body = json.clone();
 
     let result: HttpResponse = match user_controller::new_user(
         data,
-        new_user_info.admin_id,
-        new_user_info.username,
-        new_user_info.email,
-        new_user_info.name,
-        new_user_info.password,
-        new_user_info.user_type_id,
+        claims.0,
+        body.username,
+        body.email,
+        body.name,
+        body.password,
+        body.user_type_id,
     )
     .await
     {
@@ -153,19 +242,20 @@ pub async fn new_user(
 
 pub async fn update_user(
     data: web::Data<AppState>,
-    req: HttpRequest,
+    claims: RequireGlobal<{ global::ADMIN }>,
     json: web::Json<UpdateUserRequestBody>,
 ) -> HttpResponse {
-    let update_user_info = json.clone();
+    let body = json.clone();
+
     let result: HttpResponse = match user_controller::update_user(
         data,
-        update_user_info.admin_id,
-        update_user_info.id,
-        update_user_info.username,
-        update_user_info.email,
-        update_user_info.name,
-        update_user_info.user_type_id,
-        update_user_info.original_user_type,
+        claims.0,
+        body.id,
+        body.username,
+        body.email,
+        body.name,
+        body.user_type_id,
+        body.account_status_id,
     )
     .await
     {
@@ -176,17 +266,49 @@ pub async fn update_user(
     result
 }
 
-pub async fn reset_user_password(
+pub async fn update_profile(
     data: web::Data<AppState>,
-    req: HttpRequest,
-    json: web::Json<ResetPasswordUserRequestBody>,
+    claims: RequireGlobal<{ global::VIEWER }>,
+    json: web::Json<UpdateProfileRequestBody>,
 ) -> HttpResponse {
-    let password_reset_user_info = json.clone();
-    let result: HttpResponse = match user_controller::reset_user_password(
+    let body = json.clone();
+
+    let result: HttpResponse = match user_controller::update_profile(data, claims.0, body).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn update_status(
+    data: web::Data<AppState>,
+    claims: RequireGlobal<{ global::VIEWER }>,
+    json: web::Json<UpdateStatusRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match user_controller::update_status(data, claims.0, body.status_id).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn change_password(
+    data: web::Data<AppState>,
+    claims: RequireGlobal<{ global::VIEWER }>,
+    json: web::Json<ChangePasswordRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match user_controller::change_password(
         data,
-        password_reset_user_info.username,
-        password_reset_user_info.email,
-        password_reset_user_info.password,
+        claims.0,
+        body.current_password,
+        body.new_password,
     )
     .await
     {
@@ -199,17 +321,15 @@ pub async fn reset_user_password(
 
 pub async fn delete_user(
     data: web::Data<AppState>,
-    req: HttpRequest,
+    claims: RequireGlobal<{ global::ADMIN }>,
     json: web::Json<DeleteUserRequestBody>,
 ) -> HttpResponse {
-    let delete_user_info = json.clone();
-    let result: HttpResponse =
-        match user_controller::delete_user(data, delete_user_info.admin_id, delete_user_info.id)
-            .await
-        {
-            Ok(res) => res,
-            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-        };
+    let body = json.clone();
+
+    let result: HttpResponse = match user_controller::delete_user(data, claims.0, body.id).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
 
     result
 }
