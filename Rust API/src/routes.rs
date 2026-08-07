@@ -1,142 +1,152 @@
 use crate::auth;
 use actix_web::{middleware::from_fn, web};
-mod page_css_routes;
-mod page_elements_routes;
-mod page_permissions_routes;
-mod page_routes;
+mod chat_group_routes;
+mod direct_message_routes;
+mod login_routes;
+mod relationship_routes;
 mod user_routes;
+mod ws_routes;
 
-pub fn configure_login_user_routes(cfg: &mut web::ServiceConfig) {
+// --- LOGIN ROUTES ---
+// Protected by app_auth — checks app secret, no JWT needed
+
+pub fn configure_login_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/login")
             .wrap(from_fn(auth::app_auth))
-            .route("/register-user", web::post().to(user_routes::register_user))
-            .route("/login-user", web::post().to(user_routes::login_user))
+            .route("/register", web::post().to(login_routes::register_user))
+            .route("/login", web::post().to(login_routes::login_user))
+            .route("/refresh", web::post().to(login_routes::refresh_token))
             .route(
-                "/reset-user-password",
-                web::post().to(user_routes::reset_user_password),
+                "/reset-password",
+                web::post().to(login_routes::reset_user_password),
             ),
     );
 }
 
-/*pub fn configure_auth_route(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/auth")
-            .wrap(from_fn(auth::auth))
-            .route("/try-auth", web::post().to(auth::try_auth)),
-    );
-}*/
+// --- USER ROUTES ---
+// No middleware — RequireGlobal extractor handles auth and permissions
 
 pub fn configure_user_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/users")
-            .wrap(from_fn(auth::auth))
-            .route("/list/{i}", web::get().to(user_routes::list_users))
-            .route(
-                "/user-types/{i}",
-                web::get().to(user_routes::list_user_types),
-            )
-            //.route("/user/{i}", web::get().to(user_routes::get_user))
-            .route("/user", web::post().to(user_routes::new_user))
+            .route("/list", web::get().to(user_routes::list_users))
+            .route("/user-types", web::get().to(user_routes::list_user_types))
+            .route("/user/new", web::post().to(user_routes::new_user))
+            .route("/user/get", web::post().to(user_routes::get_user))
             .route("/user", web::put().to(user_routes::update_user))
-            .route("/user", web::delete().to(user_routes::delete_user)),
+            .route("/user", web::delete().to(user_routes::delete_user))
+            .route("/logout", web::post().to(user_routes::logout_user))
+            .route("/profile", web::put().to(user_routes::update_profile))
+            .route("/status", web::put().to(user_routes::update_status)),
     );
 }
 
-pub fn configure_page_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/pages")
-            .wrap(from_fn(auth::auth))
-            .route(
-                "/list-pages-usermade",
-                web::post().to(page_routes::list_pages_usermade),
-            )
-            .route("/list/{i}", web::get().to(page_routes::list_all_pages))
-            .route(
-                "/list-creators/{i}",
-                web::get().to(page_routes::list_all_page_creators),
-            )
-            .route("/page/get", web::post().to(page_routes::get_page))
-            .route("/page/post", web::post().to(page_routes::new_page))
-            .route("/page", web::put().to(page_routes::update_page))
-            .route("/page", web::delete().to(page_routes::delete_page)),
-    );
-}
+// --- RELATIONSHIP ROUTES ---
+// No middleware — RequireGlobal extractor handles auth and permissions
 
-pub fn configure_page_element_routes(cfg: &mut web::ServiceConfig) {
+pub fn configure_relationship_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/page-elements")
-            .wrap(from_fn(auth::auth))
+        web::scope("/relationships")
             .route(
-                "/list-elements",
-                web::post().to(page_elements_routes::list_page_elements),
+                "/list",
+                web::get().to(relationship_routes::list_relationships),
             )
             .route(
-                "/page-elements-types",
-                web::post().to(page_elements_routes::list_page_element_types),
+                "/relationship",
+                web::post().to(relationship_routes::new_relationship),
             )
             .route(
-                "/new-elements",
-                web::post().to(page_elements_routes::new_page_elements),
+                "/relationship",
+                web::put().to(relationship_routes::update_relationship),
             )
             .route(
-                "/update-elements",
-                web::put().to(page_elements_routes::update_page_elements),
-            )
-            .route(
-                "/delete-elements",
-                web::delete().to(page_elements_routes::delete_page_element),
+                "/relationship",
+                web::delete().to(relationship_routes::delete_relationship),
             ),
     );
 }
 
-pub fn configure_page_permission_routes(cfg: &mut web::ServiceConfig) {
+// --- DIRECT MESSAGE ROUTES ---
+// No middleware — RequireGlobal extractor handles auth and permissions
+
+pub fn configure_direct_message_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/page-permissions")
-            .wrap(from_fn(auth::auth))
+        web::scope("/direct-messages")
             .route(
-                "/all-page-user-permissions",
-                web::post().to(page_permissions_routes::list_user_pages_permissions),
+                "/list",
+                web::get().to(direct_message_routes::list_conversations),
             )
             .route(
-                "/all-page-users-with-permissions",
-                web::post().to(page_permissions_routes::list_users_with_page_permissions),
+                "/messages",
+                web::post().to(direct_message_routes::list_messages),
             )
             .route(
-                "/all-page-users-without-permissions",
-                web::post().to(page_permissions_routes::list_users_without_page_permissions),
+                "/message",
+                web::post().to(direct_message_routes::send_message),
             )
             .route(
-                "/page-permission-types",
-                web::post().to(page_permissions_routes::list_page_permission_types),
+                "/message",
+                web::put().to(direct_message_routes::update_message),
             )
             .route(
-                "/user-page-permissions",
-                web::post().to(page_permissions_routes::get_user_page_permission),
-            )
-            .route(
-                "/page-permission",
-                web::post().to(page_permissions_routes::new_user_page_permission),
-            )
-            .route(
-                "/page-permission",
-                web::put().to(page_permissions_routes::update_user_page_permission),
-            )
-            .route(
-                "/page-permission",
-                web::delete().to(page_permissions_routes::delete_page_permission),
+                "/message",
+                web::delete().to(direct_message_routes::delete_message),
             ),
     );
 }
 
-pub fn configure_page_css_routes(cfg: &mut web::ServiceConfig) {
+// --- CHAT GROUP ROUTES ---
+// No middleware — RequireGroup extractor handles auth and permissions
+
+pub fn configure_chat_group_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/page-css")
+        web::scope("/groups")
+            // Group management
+            .route("/list", web::get().to(chat_group_routes::list_groups))
+            .route("/group/get", web::post().to(chat_group_routes::get_group))
+            .route("/group/new", web::post().to(chat_group_routes::new_group))
+            .route("/group", web::put().to(chat_group_routes::update_group))
+            .route("/group", web::delete().to(chat_group_routes::delete_group))
+            // Group messages
+            .route(
+                "/messages",
+                web::post().to(chat_group_routes::list_messages),
+            )
+            .route("/message", web::post().to(chat_group_routes::send_message))
+            .route("/message", web::put().to(chat_group_routes::update_message))
+            .route(
+                "/message",
+                web::delete().to(chat_group_routes::delete_message),
+            )
+            // Group permissions
+            .route(
+                "/permissions",
+                web::post().to(chat_group_routes::list_group_permissions),
+            )
+            .route(
+                "/permission/new",
+                web::post().to(chat_group_routes::add_group_permission),
+            )
+            .route(
+                "/permission",
+                web::put().to(chat_group_routes::update_group_permission),
+            )
+            .route(
+                "/permission",
+                web::delete().to(chat_group_routes::delete_group_permission),
+            ),
+    );
+}
+
+// --- WEBSOCKET ROUTE ---
+// Still needs auth middleware since WS connection upgrade
+// can't use extractors the same way
+
+pub fn configure_ws_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/ws")
             .wrap(from_fn(auth::auth))
-            .route("/list-css", web::post().to(page_css_routes::list_page_css))
-            .route("/css/{i}", web::get().to(page_css_routes::get_page_css))
-            .route("/css", web::post().to(page_css_routes::new_page_css))
-            .route("/css", web::put().to(page_css_routes::update_page_css))
-            .route("/css", web::delete().to(page_css_routes::delete_page_css)),
+            .route("", web::get().to(ws_routes::ws_handler)),
     );
 }

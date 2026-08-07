@@ -1,11 +1,9 @@
-use crate::auth::verify_access_token;
-use crate::auth::JwtClaims;
+use crate::auth::{verify_access_token, JwtClaims};
 use actix_web::{
     dev::Payload,
     error::{ErrorForbidden, ErrorInternalServerError, ErrorUnauthorized},
     FromRequest, HttpRequest,
 };
-use futures::future::{ready, Ready};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -119,59 +117,128 @@ pub fn permission_error_message(err_code: u8) -> &'static str {
     }
 }
 
+// --- HELPER ---
+// Extracts and verifies JWT from Authorization header
+// Returns fresh JwtClaims with DB values overlaid
+
+async fn extract_and_verify(req: &HttpRequest) -> Result<JwtClaims, actix_web::Error> {
+    // Get Authorization header
+    let auth_header = match req.headers().get("Authorization") {
+        Some(h) => h,
+        None => {
+            return Err(ErrorUnauthorized("No Authorization header"));
+        }
+    };
+
+    // Parse header value
+    let auth_str = match auth_header.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            return Err(ErrorUnauthorized("Invalid Authorization header"));
+        }
+    };
+
+    // Check Bearer prefix
+    if !auth_str.starts_with("Bearer ") {
+        return Err(ErrorUnauthorized("Invalid token format, no Bearer"));
+    }
+
+    // Extract and verify token signature and expiry
+    let token = &auth_str["Bearer ".len()..];
+
+    let claims = match verify_access_token(token) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err(ErrorUnauthorized("Invalid or expired token"));
+        }
+    };
+
+    // Get DB pool from app state
+    let data = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
+        Some(d) => d,
+        None => {
+            return Err(ErrorInternalServerError("Missing app state"));
+        }
+    };
+
+    // Query fresh user data — catches permission changes since token was issued
+    let user = match sqlx::query!(
+        "SELECT user_type_id, account_status_id FROM users WHERE id = $1",
+        claims.user_id
+    )
+    .fetch_optional(&data.db)
+    .await
+    {
+        Ok(u) => u,
+        Err(_) => {
+            return Err(ErrorInternalServerError("DB error"));
+        }
+    };
+
+    let user = match user {
+        Some(u) => u,
+        None => {
+            return Err(ErrorUnauthorized("User not found"));
+        }
+    };
+
+    // Rebuild claims with fresh DB values overlaid on top of JWT values
+    let fresh_claims = JwtClaims {
+        sub: claims.sub,
+        user_id: claims.user_id,
+        user_type_id: user.user_type_id,
+        account_status_id: user.account_status_id,
+        exp: claims.exp,
+    };
+
+    Ok(fresh_claims)
+}
+
 // --- GLOBAL PERMISSION EXTRACTOR ---
+// Used for all non-group routes
+// RequireGlobal<{ global::ADMIN }, { errors::LIST_USERS }>
 
 pub struct RequireGlobal<const LEVEL: i64, const ERR: u8>(pub JwtClaims);
 
 impl<const LEVEL: i64, const ERR: u8> FromRequest for RequireGlobal<LEVEL, ERR> {
     type Error = actix_web::Error;
-    type Future = Ready<Result<Self, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self, Self::Error>>>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let auth_header = match req.headers().get("Authorization") {
-            Some(h) => h,
-            None => {
-                return ready(Err(ErrorUnauthorized("No Authorization header")));
+        let req = req.clone();
+
+        Box::pin(async move {
+            // Verify token and get fresh claims from DB
+            let claims = match extract_and_verify(&req).await {
+                Ok(c) => c,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            // Reject blocked users
+            if claims.user_type_id == global::BLOCKED {
+                return Err(ErrorForbidden("Account is blocked"));
             }
-        };
 
-        let auth_str = match auth_header.to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                return ready(Err(ErrorUnauthorized("Invalid Authorization header")));
+            // Reject suspended or closed accounts
+            if claims.account_status_id != 1 {
+                return Err(ErrorForbidden("Account is not active"));
             }
-        };
 
-        if !auth_str.starts_with("Bearer ") {
-            return ready(Err(ErrorUnauthorized("Invalid token format, no Bearer")));
-        }
-
-        let token = &auth_str["Bearer ".len()..];
-
-        let claims = match verify_access_token(token) {
-            Ok(c) => c,
-            Err(_) => {
-                return ready(Err(ErrorUnauthorized("Invalid or expired token")));
+            // Check permission level
+            if claims.user_type_id <= LEVEL {
+                Ok(RequireGlobal(claims))
+            } else {
+                Err(ErrorForbidden(permission_error_message(ERR)))
             }
-        };
-
-        if claims.user_type_id == global::BLOCKED {
-            return ready(Err(ErrorForbidden("Account is blocked")));
-        }
-
-        if claims.account_status_id != 1 {
-            return ready(Err(ErrorForbidden("Account is not active")));
-        }
-
-        if claims.user_type_id <= LEVEL {
-            ready(Ok(RequireGlobal(claims)))
-        } else {
-            ready(Err(ErrorForbidden(permission_error_message(ERR))))
-        }
+        })
     }
 }
 
 // --- GROUP PERMISSION EXTRACTOR ---
+// Used for chat group routes only
+// RequireGroup<{ global::STANDARD_USER }, { group::MEMBER }, { errors::SEND_GROUP_MESSAGE }>
 
 pub struct RequireGroup<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> {
     pub claims: JwtClaims,
@@ -188,45 +255,30 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
         let req = req.clone();
 
         Box::pin(async move {
-            let auth_header = match req.headers().get("Authorization") {
-                Some(h) => h,
-                None => {
-                    return Err(ErrorUnauthorized("No Authorization header"));
-                }
-            };
-
-            let auth_str = match auth_header.to_str() {
-                Ok(s) => s,
-                Err(_) => {
-                    return Err(ErrorUnauthorized("Invalid Authorization header"));
-                }
-            };
-
-            if !auth_str.starts_with("Bearer ") {
-                return Err(ErrorUnauthorized("Invalid token format, no Bearer"));
-            }
-
-            let token = &auth_str["Bearer ".len()..];
-
-            let claims = match verify_access_token(token) {
+            // Verify token and get fresh claims from DB
+            let claims = match extract_and_verify(&req).await {
                 Ok(c) => c,
-                Err(_) => {
-                    return Err(ErrorUnauthorized("Invalid or expired token"));
+                Err(e) => {
+                    return Err(e);
                 }
             };
 
+            // Reject blocked users
             if claims.user_type_id == global::BLOCKED {
                 return Err(ErrorForbidden("Account is blocked"));
             }
 
+            // Reject suspended or closed accounts
             if claims.account_status_id != 1 {
                 return Err(ErrorForbidden("Account is not active"));
             }
 
+            // Check global level requirement for this route
             if claims.user_type_id > GLOBAL_LEVEL {
                 return Err(ErrorForbidden(permission_error_message(ERR)));
             }
 
+            // Admins and super admins bypass group check entirely
             if claims.user_type_id <= global::ADMIN {
                 return Ok(RequireGroup {
                     claims,
@@ -234,6 +286,16 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
                 });
             }
 
+            // Get DB pool from app state
+            let data = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
+                Some(d) => d,
+                None => {
+                    return Err(ErrorInternalServerError("Missing app state"));
+                }
+            };
+
+            // Get group_id from request body extension
+            // Set by the route handler before extractor runs
             let group_id = match req.match_info().get("group_id") {
                 Some(id) => match id.parse::<i64>() {
                     Ok(id) => id,
@@ -246,13 +308,7 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
                 }
             };
 
-            let data = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
-                Some(d) => d,
-                None => {
-                    return Err(ErrorInternalServerError("Missing app state"));
-                }
-            };
-
+            // Query fresh group permission from DB
             let group_perm = match sqlx::query_scalar!(
                 "SELECT permission_type_id FROM chat_group_permissions
                  WHERE group_id = $1 AND user_id = $2",
@@ -275,10 +331,12 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
                 }
             };
 
+            // Reject blocked group members
             if group_permission == group::BLOCKED {
                 return Err(ErrorForbidden("You are blocked in this group"));
             }
 
+            // Check group permission level
             if group_permission <= GROUP_LEVEL {
                 Ok(RequireGroup {
                     claims,
@@ -294,7 +352,6 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
 // --- MESSAGE OWNERSHIP HELPERS ---
 
 pub fn check_can_update_message(sender_id: i64, user_id: i64) -> bool {
-    // Only the sender can edit their own message — no exceptions
     sender_id == user_id
 }
 
@@ -306,10 +363,8 @@ pub fn check_can_delete_message(
 ) -> bool {
     let is_sender = sender_id == user_id;
 
-    // Global admin can delete any message
     let is_global_admin = user_type_id <= global::ADMIN;
 
-    // Group moderator can delete any message in their group
     let is_group_moderator = match group_permission {
         Some(p) => p <= group::MODERATOR,
         None => false,

@@ -1,18 +1,26 @@
-use crate::auth::{generate_token, hash_password, verify_password};
+use crate::auth::{
+    build_refresh_cookie, clear_refresh_cookie, generate_access_token, generate_refresh_token,
+    hash_password, verify_password, JwtClaims,
+};
+use crate::routes::user_routes::UpdateProfileRequestBody;
 use crate::state::AppState;
-use crate::state::User;
-use actix_web::{error, web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
+use chrono::{Duration, Utc};
 use serde::Serialize;
-use sqlx::postgres::PgQueryResult;
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
-struct QueryUsername {
-    username: String,
+// --- RESPONSE STRUCTS ---
+
+#[derive(Debug, Clone, Serialize)]
+struct Response {
+    msg: String,
+    success: bool,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
-struct QueryEmail {
-    email: String,
+#[derive(Debug, Clone, Serialize)]
+struct DataResponse<T: Serialize> {
+    msg: String,
+    data: T,
+    success: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -21,43 +29,127 @@ struct LoggedInUser {
     username: String,
     name: String,
     email: String,
+    bio_info: Option<String>,
     user_type_id: i64,
+    account_status_id: i64,
+    status_id: Option<i64>,
+    is_online: bool,
+    theme_id: Option<i64>,
+    theme_dark_mode: bool,
+    light_theme_primary_colour: String,
+    light_theme_secondary_colour: String,
+    light_theme_accent_colour: String,
+    light_theme_sent_colour: String,
+    light_theme_received_colour: String,
+    light_theme_dark_text_colour: String,
+    light_theme_light_text_colour: String,
+    dark_theme_primary_colour: String,
+    dark_theme_secondary_colour: String,
+    dark_theme_accent_colour: String,
+    dark_theme_sent_colour: String,
+    dark_theme_received_colour: String,
+    dark_theme_dark_text_colour: String,
+    dark_theme_light_text_colour: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct LoginResponse {
-    msg: String,
-    token: Option<String>,
-    user: Option<LoggedInUser>,
-    success: bool,
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct UserRow {
+    id: i64,
+    username: String,
+    name: String,
+    email: String,
+    bio_info: Option<String>,
+    user_type_id: i64,
+    account_status_id: i64,
+    status_id: Option<i64>,
+    is_online: bool,
+    theme_id: Option<i64>,
+    theme_dark_mode: bool,
+    light_theme_primary_colour: String,
+    light_theme_secondary_colour: String,
+    light_theme_accent_colour: String,
+    light_theme_sent_colour: String,
+    light_theme_received_colour: String,
+    light_theme_dark_text_colour: String,
+    light_theme_light_text_colour: String,
+    dark_theme_primary_colour: String,
+    dark_theme_secondary_colour: String,
+    dark_theme_accent_colour: String,
+    dark_theme_sent_colour: String,
+    dark_theme_received_colour: String,
+    dark_theme_dark_text_colour: String,
+    dark_theme_light_text_colour: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct Response {
-    msg: String,
-    data: Option<User>,
-    success: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct ResponseList {
-    msg: String,
-    data: Option<Vec<User>>,
-    success: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct UserType {
     id: i64,
     r#type: String,
 }
 
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct Theme {
+    id: i64,
+    theme: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
-struct ResponseTypeList {
+struct LoginResponse {
     msg: String,
-    data: Option<Vec<UserType>>,
+    access_token: Option<String>,
+    user: Option<LoggedInUser>,
+    themes: Option<Vec<Theme>>,
     success: bool,
 }
+
+// --- HELPERS ---
+
+fn empty_string_check(fields: Vec<&str>) -> bool {
+    fields.iter().any(|f| f.trim().is_empty())
+}
+
+fn user_row_to_logged_in(user: UserRow) -> LoggedInUser {
+    LoggedInUser {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        bio_info: user.bio_info,
+        user_type_id: user.user_type_id,
+        account_status_id: user.account_status_id,
+        status_id: user.status_id,
+        is_online: user.is_online,
+        theme_id: user.theme_id,
+        theme_dark_mode: user.theme_dark_mode,
+        light_theme_primary_colour: user.light_theme_primary_colour,
+        light_theme_secondary_colour: user.light_theme_secondary_colour,
+        light_theme_accent_colour: user.light_theme_accent_colour,
+        light_theme_sent_colour: user.light_theme_sent_colour,
+        light_theme_received_colour: user.light_theme_received_colour,
+        light_theme_dark_text_colour: user.light_theme_dark_text_colour,
+        light_theme_light_text_colour: user.light_theme_light_text_colour,
+        dark_theme_primary_colour: user.dark_theme_primary_colour,
+        dark_theme_secondary_colour: user.dark_theme_secondary_colour,
+        dark_theme_accent_colour: user.dark_theme_accent_colour,
+        dark_theme_sent_colour: user.dark_theme_sent_colour,
+        dark_theme_received_colour: user.dark_theme_received_colour,
+        dark_theme_dark_text_colour: user.dark_theme_dark_text_colour,
+        dark_theme_light_text_colour: user.dark_theme_light_text_colour,
+    }
+}
+
+// SELECT columns used in multiple queries — avoids repeating the long list
+const USER_SELECT: &str = "id, username, name, email, bio_info, user_type_id, account_status_id,
+    status_id, is_online, theme_id, theme_dark_mode,
+    light_theme_primary_colour, light_theme_secondary_colour,
+    light_theme_accent_colour, light_theme_sent_colour,
+    light_theme_received_colour, light_theme_dark_text_colour,
+    light_theme_light_text_colour, dark_theme_primary_colour,
+    dark_theme_secondary_colour, dark_theme_accent_colour,
+    dark_theme_sent_colour, dark_theme_received_colour,
+    dark_theme_dark_text_colour, dark_theme_light_text_colour";
+
+// --- LOGIN CONTROLLERS ---
 
 pub async fn register_user(
     data: web::Data<AppState>,
@@ -66,82 +158,65 @@ pub async fn register_user(
     name: String,
     password: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if username.trim() == "" || password.trim() == "" || email.trim() == "" || name.trim() == "" {
-        let response = LoginResponse {
-            msg: String::from("Username, Email, Name or Password must not be empty!"),
-            token: None,
-            user: None,
+    if empty_string_check(vec![&username, &email, &name, &password]) {
+        let response = Response {
+            msg: String::from("Username, Email, Name or Password must not be empty"),
             success: false,
         };
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
 
-        Ok(HttpResponse::Ok().json(response))
-    } else {
-        if (password.to_lowercase().contains("connor")) {
-            let response = LoginResponse {
-                msg: String::from("Registration Failed, Password cannot contain 'Connor'."),
-                token: None,
-                user: None,
+    let pool = data.db.to_owned();
+
+    let existing = sqlx::query!(
+        "SELECT id FROM users WHERE username = $1 OR email = $2",
+        username,
+        email
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing {
+        Some(_) => {
+            let response = Response {
+                msg: String::from("Username or Email is already in use"),
                 success: false,
             };
             Ok(HttpResponse::BadRequest().json(response))
-        } else {
-            let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-            let username_rows: Vec<QueryUsername> =
-                sqlx::query_as("SELECT username FROM users WHERE username = $1")
-                    .bind(&username)
-                    .fetch_all(&pool)
-                    .await
-                    .map_err(|e| {
-                        error::ErrorBadRequest(
-                            serde_json::to_string(&e.to_string())
-                                .unwrap_or_else(|_| "{}".to_string()),
-                        )
-                    })?;
-            let email_rows: Vec<QueryEmail> =
-                sqlx::query_as("SELECT email FROM users WHERE email = $1")
-                    .bind(&email)
-                    .fetch_all(&pool)
-                    .await
-                    .map_err(|e| {
-                        error::ErrorBadRequest(
-                            serde_json::to_string(&e.to_string())
-                                .unwrap_or_else(|_| "{}".to_string()),
-                        )
-                    })?;
+        }
+        None => {
+            let hashed_password = hash_password(&password);
 
-            if username_rows.len() == 0 && email_rows.len() == 0 {
-                let hashed_password = hash_password(&password);
-                let result = sqlx::query(
-                "INSERT INTO users (username, email, name, password, user_type_id) VALUES ($1, $2, $3, $4, $5)",
+            let result = sqlx::query!(
+                "INSERT INTO users (username, email, name, password_hash, user_type_id, account_status_id)
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+                username,
+                email,
+                name,
+                hashed_password,
+                4i64,
+                1i64
             )
-            .bind(username)
-            .bind(email)
-            .bind(name)
-            .bind(&hashed_password)
-            .bind(4)
             .execute(&pool)
             .await
-            .map_err(|e| {
-                    error::ErrorBadRequest(serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),)})?;
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                let response = LoginResponse {
-                    msg: String::from("Success"),
-                    token: None,
-                    user: None,
-                    success: true,
-                };
-
-                Ok(HttpResponse::Ok().json(response))
-            } else {
-                let response = LoginResponse {
-                    msg: String::from(
-                        "Registration Failed, Username or Email may Already be in use.",
-                    ),
-                    token: None,
-                    user: None,
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
+            match result.rows_affected() {
+                0 => {
+                    let response = Response {
+                        msg: String::from("Registration failed"),
+                        success: false,
+                    };
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                _ => {
+                    let response = Response {
+                        msg: String::from("Registration successful"),
+                        success: true,
+                    };
+                    Ok(HttpResponse::Ok().json(response))
+                }
             }
         }
     }
@@ -152,53 +227,120 @@ pub async fn login_user(
     username: String,
     password: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if username.trim() == "" || password.trim() == "" {
-        Ok(HttpResponse::BadRequest().body("Username or Password must not be empty!"))
-    } else {
-        let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-        let rows: Vec<User> =
-            sqlx::query_as("SELECT id, username, email, name, password, date_created, user_type_id FROM users WHERE username = $1")
-                .bind(&username)
-                .fetch_all(&pool)
-                .await
-                .map_err(|e| {
-                    error::ErrorBadRequest(serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),)})?;
-        if rows.len() == 0 {
+    if empty_string_check(vec![&username, &password]) {
+        let response = Response {
+            msg: String::from("Username or Password must not be empty"),
+            success: false,
+        };
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+    let pool = data.db.to_owned();
+
+    let user = sqlx::query_as!(
+        UserRow,
+        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
+                status_id, is_online, theme_id, theme_dark_mode,
+                light_theme_primary_colour, light_theme_secondary_colour,
+                light_theme_accent_colour, light_theme_sent_colour,
+                light_theme_received_colour, light_theme_dark_text_colour,
+                light_theme_light_text_colour, dark_theme_primary_colour,
+                dark_theme_secondary_colour, dark_theme_accent_colour,
+                dark_theme_sent_colour, dark_theme_received_colour,
+                dark_theme_dark_text_colour, dark_theme_light_text_colour
+         FROM users WHERE username = $1",
+        username
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match user {
+        None => {
             let response = LoginResponse {
-                msg: String::from(
-                    "Login Failed, Username may be Incorrect, as User does not Exist.",
-                ),
-                token: None,
+                msg: String::from("Username not found"),
+                access_token: None,
                 user: None,
+                themes: None,
                 success: false,
             };
             Ok(HttpResponse::BadRequest().json(response))
-        } else {
-            match verify_password(&password, &rows[0].password) {
-                Ok(_) => {
-                    let token = generate_token(rows[0].username.clone());
-                    let user = rows[0].clone();
+        }
+        Some(user) => {
+            // Fetch password hash and account status separately
+            let auth_row = sqlx::query!(
+                "SELECT password_hash, account_status_id FROM users WHERE id = $1",
+                user.id
+            )
+            .fetch_one(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                    let logged_in_user = LoggedInUser {
-                        id: user.id,
-                        username: user.username,
-                        name: user.name,
-                        email: user.email,
-                        user_type_id: user.user_type_id,
-                    };
+            // Check account is active
+            if auth_row.account_status_id != 1 {
+                let response = LoginResponse {
+                    msg: String::from("Account is suspended or closed"),
+                    access_token: None,
+                    user: None,
+                    themes: None,
+                    success: false,
+                };
+                return Ok(HttpResponse::Unauthorized().json(response));
+            }
+
+            match verify_password(&password, &auth_row.password_hash) {
+                Ok(_) => {
+                    let access_token = generate_access_token(
+                        user.username.clone(),
+                        user.id,
+                        user.user_type_id,
+                        user.account_status_id,
+                    );
+                    let refresh_token = generate_refresh_token();
+                    let refresh_expires = Utc::now() + Duration::days(7);
+
+                    // Store refresh token and set online
+                    sqlx::query!(
+                        "UPDATE users SET
+                            refresh_token = $1,
+                            refresh_token_expires_at = $2,
+                            refresh_token_created_at = COALESCE(refresh_token_created_at, NOW()),
+                            refresh_token_updated_at = NOW(),
+                            is_online = TRUE,
+                            status_id = 1
+                         WHERE id = $3",
+                        refresh_token,
+                        refresh_expires,
+                        user.id
+                    )
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+                    // Fetch themes to return with login response
+                    let themes = sqlx::query_as!(Theme, "SELECT id, theme FROM themes ORDER BY id")
+                        .fetch_all(&pool)
+                        .await
+                        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
                     let response = LoginResponse {
-                        msg: String::from("Success"),
-                        token: Some(token),
-                        user: Some(logged_in_user),
+                        msg: String::from("Login successful"),
+                        access_token: Some(access_token),
+                        user: Some(user_row_to_logged_in(user)),
+                        themes: Some(themes),
                         success: true,
                     };
-                    Ok(HttpResponse::Ok().json(response))
+
+                    Ok(HttpResponse::Ok()
+                        .cookie(build_refresh_cookie(refresh_token))
+                        .json(response))
                 }
                 Err(_) => {
                     let response = LoginResponse {
-                        msg: String::from("Password is Uncorrect!"),
-                        token: None,
+                        msg: String::from("Incorrect password"),
+                        access_token: None,
                         user: None,
+                        themes: None,
                         success: false,
                     };
                     Ok(HttpResponse::Unauthorized().json(response))
@@ -208,368 +350,150 @@ pub async fn login_user(
     }
 }
 
-pub async fn list_users(
+pub async fn refresh_token(
     data: web::Data<AppState>,
-    id: i64,
+    req: HttpRequest,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-
-    let get_admin_user = sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| {
-            error::ErrorBadRequest(
-                serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-            )
-        })?;
-    if (!get_admin_user.is_none()) {
-        let actual = get_admin_user.unwrap();
-        if (actual.user_type_id > 2) {
+    let cookie = match req.cookie("refresh_token") {
+        Some(c) => c,
+        None => {
             let response = Response {
-                msg: String::from("User is Unauthorized to Manage Users"),
-                data: None,
+                msg: String::from("No refresh token"),
                 success: false,
             };
-
-            Ok(HttpResponse::Unauthorized().json(response))
-        } else {
-            let users: Vec<User> = sqlx::query_as!(
-        User,
-        "SELECT id, date_created, username, email, password, name, user_type_id FROM users ORDER BY id"
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-
-            if (users.is_empty()) {
-                let response = Response {
-                    msg: String::from("Query failed, no Users."),
-                    data: None,
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
-                let response = ResponseList {
-                    msg: String::from("Success"),
-                    data: Some(users),
-                    success: true,
-                };
-
-                Ok(HttpResponse::Ok().json(response))
-            }
+            return Ok(HttpResponse::Unauthorized().json(response));
         }
-    } else {
-        let response = Response {
-            msg: String::from("Query failed, Admin User not found"),
-            data: None,
-            success: false,
-        };
+    };
 
-        Ok(HttpResponse::BadRequest().json(response))
-    }
-}
+    let refresh_token = cookie.value().to_string();
+    let pool = data.db.to_owned();
 
-pub async fn list_user_types(
-    data: web::Data<AppState>,
-    id: i64,
-) -> Result<HttpResponse, actix_web::Error> {
-    let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-
-    let get_admin_user = sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| {
-            error::ErrorBadRequest(
-                serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-            )
-        })?;
-    if (!get_admin_user.is_none()) {
-        let actual = get_admin_user.unwrap();
-        if (actual.user_type_id > 2) {
-            let response = Response {
-                msg: String::from("User is Unauthorized to Manage Users"),
-                data: None,
-                success: false,
-            };
-
-            Ok(HttpResponse::Unauthorized().json(response))
-        } else {
-            let user_types: Vec<UserType> =
-                sqlx::query_as!(UserType, "SELECT id, type FROM user_types ORDER BY id")
-                    .fetch_all(&pool)
-                    .await
-                    .map_err(|e| {
-                        error::ErrorBadRequest(
-                            serde_json::to_string(&e.to_string())
-                                .unwrap_or_else(|_| "{}".to_string()),
-                        )
-                    })?;
-
-            if (user_types.is_empty()) {
-                let response = Response {
-                    msg: String::from("Query failed, no Users."),
-                    data: None,
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
-                let response = ResponseTypeList {
-                    msg: String::from("Success"),
-                    data: Some(user_types),
-                    success: true,
-                };
-
-                Ok(HttpResponse::Ok().json(response))
-            }
-        }
-    } else {
-        let response = Response {
-            msg: String::from("Query failed, Admin User not found"),
-            data: None,
-            success: false,
-        };
-
-        Ok(HttpResponse::BadRequest().json(response))
-    }
-}
-
-/*pub async fn get_user(
-    data: web::Data<AppState>,
-    id: i64,
-) -> Result<HttpResponse, actix_web::Error> {
-    let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-
-    let result = sqlx::query!(
-        "SELECT id, date_created, username, email, name, user_type_id FROM users WHERE id = $1",
-        id
+    let user = sqlx::query!(
+        "SELECT id, username, user_type_id, account_status_id, refresh_token_expires_at
+         FROM users WHERE refresh_token = $1",
+        refresh_token
     )
     .fetch_optional(&pool)
     .await
-    .map_err(|e| {
-        error::ErrorBadRequest(
-            serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-        )
-    })?;
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.is_none()) {
-        let actual = result.unwrap();
-
-        let user = User {
-            id: actual.id,
-            date_created: actual.date_created,
-            username: actual.username,
-            email: actual.email,
-            password: String::from(""),
-            name: actual.name,
-            user_type_id: actual.user_type_id,
-        };
-
-        let response = Response {
-            msg: String::from("Success"),
-            data: Some(user),
-            success: true,
-        };
-
-        Ok(HttpResponse::Ok().json(response))
-    } else {
-        let response = Response {
-            msg: String::from("Query failed, User not found"),
-            data: None,
-            success: false,
-        };
-
-        Ok(HttpResponse::BadRequest().json(response))
-    }
-}*/
-
-pub async fn new_user(
-    data: web::Data<AppState>,
-    admin_id: i64,
-    username: String,
-    email: String,
-    name: String,
-    password: String,
-    user_type_id: i64,
-) -> Result<HttpResponse, actix_web::Error> {
-    if username.trim() == "" || name.trim() == "" || email.trim() == "" || password.trim() == "" {
-        let response = Response {
-            msg: String::from("Username, Email, Name or Password must not be empty!"),
-            data: None,
-            success: false,
-        };
-
-        Ok(HttpResponse::BadRequest().json(response))
-    } else {
-        let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-
-        let get_admin_user =
-            sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", admin_id)
-                .fetch_optional(&pool)
-                .await
-                .map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-        if (!get_admin_user.is_none()) {
-            let actual_admin_user = get_admin_user.unwrap();
-            if (actual_admin_user.user_type_id > 2 || actual_admin_user.user_type_id > user_type_id)
-            {
-                let response = Response {
-                    msg: String::from("User is Unauthorized to Create this User."),
-                    data: None,
-                    success: false,
-                };
-
-                Ok(HttpResponse::Unauthorized().json(response))
-            } else {
-                let result: sqlx::postgres::PgQueryResult = sqlx::query(
-        "INSERT INTO users (username, email, name, password, user_type_id) VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(username)
-    .bind(email)
-    .bind(name)
-    .bind(password)
-    .bind(user_type_id)
-    .execute(&pool)
-    .await
-    .map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-
-                if (result.rows_affected() == 0) {
-                    let response = Response {
-                        msg: String::from("Query failed, no new User created."),
-                        data: None,
-                        success: false,
-                    };
-                    Ok(HttpResponse::BadRequest().json(response))
-                } else {
-                    let response = Response {
-                        msg: String::from("Success"),
-                        data: None,
-                        success: true,
-                    };
-
-                    Ok(HttpResponse::Ok().json(response))
-                }
-            }
-        } else {
+    match user {
+        None => {
             let response = Response {
-                msg: String::from("Query failed, Admin User not found"),
-                data: None,
+                msg: String::from("Invalid refresh token"),
                 success: false,
             };
+            Ok(HttpResponse::Unauthorized().json(response))
+        }
+        Some(user) => {
+            let expires_at = match user.refresh_token_expires_at {
+                Some(exp) => exp,
+                None => {
+                    let response = Response {
+                        msg: String::from("Refresh token has no expiry"),
+                        success: false,
+                    };
+                    return Ok(HttpResponse::Unauthorized().json(response));
+                }
+            };
 
-            Ok(HttpResponse::BadRequest().json(response))
+            if Utc::now() > expires_at {
+                sqlx::query!(
+                    "UPDATE users SET
+                        refresh_token = NULL,
+                        refresh_token_expires_at = NULL,
+                        refresh_token_updated_at = NOW()
+                     WHERE id = $1",
+                    user.id
+                )
+                .execute(&pool)
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+                let response = Response {
+                    msg: String::from("Refresh token expired, please log in again"),
+                    success: false,
+                };
+                return Ok(HttpResponse::Unauthorized()
+                    .cookie(clear_refresh_cookie())
+                    .json(response));
+            }
+
+            if user.account_status_id != 1 {
+                let response = Response {
+                    msg: String::from("Account is suspended or closed"),
+                    success: false,
+                };
+                return Ok(HttpResponse::Unauthorized()
+                    .cookie(clear_refresh_cookie())
+                    .json(response));
+            }
+
+            // Generate new access token and rotate refresh token
+            let new_access_token = generate_access_token(
+                user.username,
+                user.id,
+                user.user_type_id,
+                user.account_status_id,
+            );
+            let new_refresh_token = generate_refresh_token();
+            let new_refresh_expires = Utc::now() + Duration::days(7);
+
+            sqlx::query!(
+                "UPDATE users SET
+                    refresh_token = $1,
+                    refresh_token_expires_at = $2,
+                    refresh_token_updated_at = NOW()
+                 WHERE id = $3",
+                new_refresh_token,
+                new_refresh_expires,
+                user.id
+            )
+            .execute(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            let response = DataResponse {
+                msg: String::from("Token refreshed"),
+                data: new_access_token,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok()
+                .cookie(build_refresh_cookie(new_refresh_token))
+                .json(response))
         }
     }
 }
 
-pub async fn update_user(
+pub async fn logout_user(
     data: web::Data<AppState>,
-    admin_id: i64,
-    id: i64,
-    username: String,
-    email: String,
-    name: String,
-    user_type_id: i64,
-    original_user_type: i64,
+    claims: JwtClaims,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if username.trim() == "" || name.trim() == "" || email.trim() == "" {
-        let response = Response {
-            msg: String::from("Username, Email or Name  must not be empty!"),
-            data: None,
-            success: false,
-        };
+    let pool = data.db.to_owned();
 
-        Ok(HttpResponse::BadRequest().json(response))
-    } else {
-        let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-        let get_admin_user =
-            sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", admin_id)
-                .fetch_optional(&pool)
-                .await
-                .map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-        if (!get_admin_user.is_none()) {
-            let actual_admin_user = get_admin_user.unwrap();
-            if (actual_admin_user.user_type_id > 2) {
-                let response = Response {
-                    msg: String::from("User is Unauthorized to Edit this User."),
-                    data: None,
-                    success: false,
-                };
-
-                Ok(HttpResponse::Unauthorized().json(response))
-            } else if (actual_admin_user.user_type_id > user_type_id) {
-                let response = Response {
-                    msg: String::from("User is Not Authorized to Update an Existing User to an Admin Type higher than their own."),
-                    data: None,
-                    success: false,
-                };
-
-                Ok(HttpResponse::Unauthorized().json(response))
-            } else if (actual_admin_user.user_type_id > original_user_type) {
-                let response = Response {
-                    msg: String::from("User is Not Authorized to Update a User with an Admin Type Greater than their own."),
-                    data: None,
-                    success: false,
-                };
-
-                Ok(HttpResponse::Unauthorized().json(response))
-            } else {
-                let result: PgQueryResult = sqlx::query(
-        "UPDATE users SET username = $1, email = $2, name = $3, user_type_id = $4 WHERE id = $5",
+    sqlx::query!(
+        "UPDATE users SET
+            refresh_token = NULL,
+            refresh_token_expires_at = NULL,
+            refresh_token_updated_at = NOW(),
+            is_online = FALSE,
+            status_id = 4
+         WHERE id = $1",
+        claims.user_id
     )
-    .bind(username)
-    .bind(email)
-    .bind(name)
-    .bind(user_type_id)
-    .bind(id)
     .execute(&pool)
     .await
-    .map_err(|e| {
-        error::ErrorBadRequest(
-            serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-        )
-    })?;
-                if (result.rows_affected() == 0) {
-                    let response = Response {
-                        msg: String::from("Query failed, User was not Updated, they may not Exist"),
-                        data: None,
-                        success: false,
-                    };
-                    Ok(HttpResponse::BadRequest().json(response))
-                } else {
-                    let response = Response {
-                        msg: String::from("Success"),
-                        data: None,
-                        success: true,
-                    };
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                    Ok(HttpResponse::Ok().json(response))
-                }
-            }
-        } else {
-            let response = Response {
-                msg: String::from("Query failed, Admin User not found"),
-                data: None,
-                success: false,
-            };
+    let response = Response {
+        msg: String::from("Logged out successfully"),
+        success: true,
+    };
 
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-    }
+    Ok(HttpResponse::Ok()
+        .cookie(clear_refresh_cookie())
+        .json(response))
 }
 
 pub async fn reset_user_password(
@@ -578,304 +502,571 @@ pub async fn reset_user_password(
     email: String,
     password: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if email.trim() == "" || username.trim() == "" || password.trim() == "" {
+    if empty_string_check(vec![&username, &email, &password]) {
         let response = Response {
-            msg: String::from("Email, Username or Password must not be empty!"),
-            data: None,
+            msg: String::from("Username, Email or Password must not be empty"),
             success: false,
         };
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
 
-        Ok(HttpResponse::BadRequest().json(response))
-    } else {
-        let hashed_password = hash_password(&password);
-        let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
-        let get_user = sqlx::query!(
-            "SELECT id, email, username FROM users WHERE email = $1 AND username = $2",
-            email,
-            username
-        )
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| {
-            error::ErrorBadRequest(
-                serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-            )
-        })?;
-        if (!get_user.is_none()) {
-            let actual_user = get_user.unwrap();
+    let pool = data.db.to_owned();
 
-            let result: PgQueryResult = sqlx::query("UPDATE users SET password = $1 WHERE id = $2")
-                .bind(hashed_password)
-                .bind(actual_user.id)
-                .execute(&pool)
-                .await
-                .map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-            if (result.rows_affected() == 0) {
-                let response = Response {
-                    msg: String::from("Query failed, Password was not Updated, User may not Exist"),
-                    data: None,
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
-                let response = Response {
-                    msg: String::from("Success"),
-                    data: None,
-                    success: true,
-                };
+    let user = sqlx::query!(
+        "SELECT id FROM users WHERE username = $1 AND email = $2",
+        username,
+        email
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                Ok(HttpResponse::Ok().json(response))
-            }
-        } else {
+    match user {
+        None => {
             let response = Response {
-                msg: String::from("Query failed, User not found, Check Email and Username"),
-                data: None,
+                msg: String::from("No user found with that username and email"),
                 success: false,
             };
-
             Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(user) => {
+            let hashed_password = hash_password(&password);
+
+            let result = sqlx::query!(
+                "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+                hashed_password,
+                user.id
+            )
+            .execute(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            match result.rows_affected() {
+                0 => {
+                    let response = Response {
+                        msg: String::from("Password reset failed"),
+                        success: false,
+                    };
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                _ => {
+                    let response = Response {
+                        msg: String::from("Password reset successful"),
+                        success: true,
+                    };
+                    Ok(HttpResponse::Ok().json(response))
+                }
+            }
+        }
+    }
+}
+
+// --- USER CONTROLLERS ---
+
+pub async fn list_users(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let users = sqlx::query_as!(
+        UserRow,
+        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
+                status_id, is_online, theme_id, theme_dark_mode,
+                light_theme_primary_colour, light_theme_secondary_colour,
+                light_theme_accent_colour, light_theme_sent_colour,
+                light_theme_received_colour, light_theme_dark_text_colour,
+                light_theme_light_text_colour, dark_theme_primary_colour,
+                dark_theme_secondary_colour, dark_theme_accent_colour,
+                dark_theme_sent_colour, dark_theme_received_colour,
+                dark_theme_dark_text_colour, dark_theme_light_text_colour
+         FROM users ORDER BY id"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match users.is_empty() {
+        true => {
+            let response = Response {
+                msg: String::from("No users found"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        false => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: users,
+                success: true,
+            };
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn list_user_types(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let user_types = sqlx::query_as!(UserType, "SELECT id, type FROM user_types ORDER BY id")
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match user_types.is_empty() {
+        true => {
+            let response = Response {
+                msg: String::from("No user types found"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        false => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: user_types,
+                success: true,
+            };
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn get_user(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let user = sqlx::query_as!(
+        UserRow,
+        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
+                status_id, is_online, theme_id, theme_dark_mode,
+                light_theme_primary_colour, light_theme_secondary_colour,
+                light_theme_accent_colour, light_theme_sent_colour,
+                light_theme_received_colour, light_theme_dark_text_colour,
+                light_theme_light_text_colour, dark_theme_primary_colour,
+                dark_theme_secondary_colour, dark_theme_accent_colour,
+                dark_theme_sent_colour, dark_theme_received_colour,
+                dark_theme_dark_text_colour, dark_theme_light_text_colour
+         FROM users WHERE id = $1",
+        id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match user {
+        None => {
+            let response = Response {
+                msg: String::from("User not found"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(user) => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: user,
+                success: true,
+            };
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn new_user(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    username: String,
+    email: String,
+    name: String,
+    password: String,
+    user_type_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    if empty_string_check(vec![&username, &email, &name, &password]) {
+        let response = Response {
+            msg: String::from("Username, Email, Name or Password must not be empty"),
+            success: false,
+        };
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+    // Cannot create a user with higher authority than yourself
+    if claims.user_type_id > user_type_id {
+        let response = Response {
+            msg: String::from("You cannot create a user with higher authority than yourself"),
+            success: false,
+        };
+        return Ok(HttpResponse::Forbidden().json(response));
+    }
+
+    let pool = data.db.to_owned();
+
+    let existing = sqlx::query!(
+        "SELECT id FROM users WHERE username = $1 OR email = $2",
+        username,
+        email
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing {
+        Some(_) => {
+            let response = Response {
+                msg: String::from("Username or Email is already in use"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        None => {
+            let hashed_password = hash_password(&password);
+
+            let result = sqlx::query!(
+                "INSERT INTO users (username, email, name, password_hash, user_type_id,
+                  account_status_id, created_by, updated_by)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                username,
+                email,
+                name,
+                hashed_password,
+                user_type_id,
+                1i64,
+                claims.user_id,
+                claims.user_id
+            )
+            .execute(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            match result.rows_affected() {
+                0 => {
+                    let response = Response {
+                        msg: String::from("Failed to create user"),
+                        success: false,
+                    };
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                _ => {
+                    let response = Response {
+                        msg: String::from("User created successfully"),
+                        success: true,
+                    };
+                    Ok(HttpResponse::Ok().json(response))
+                }
+            }
+        }
+    }
+}
+
+pub async fn update_user(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    id: i64,
+    username: String,
+    email: String,
+    name: String,
+    user_type_id: i64,
+    account_status_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    if empty_string_check(vec![&username, &email, &name]) {
+        let response = Response {
+            msg: String::from("Username, Email or Name must not be empty"),
+            success: false,
+        };
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+    let pool = data.db.to_owned();
+
+    // Fetch target user to check their current type
+    let target_user = sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match target_user {
+        None => {
+            let response = Response {
+                msg: String::from("User not found"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(target) => {
+            // Cannot update a user with higher authority than yourself
+            if claims.user_type_id > target.user_type_id {
+                let response = Response {
+                    msg: String::from(
+                        "You cannot update a user with higher authority than yourself",
+                    ),
+                    success: false,
+                };
+                return Ok(HttpResponse::Forbidden().json(response));
+            }
+
+            // Cannot set a user to a type with higher authority than yourself
+            if claims.user_type_id > user_type_id {
+                let response = Response {
+                    msg: String::from(
+                        "You cannot set a user to a type with higher authority than yourself",
+                    ),
+                    success: false,
+                };
+                return Ok(HttpResponse::Forbidden().json(response));
+            }
+
+            let result = sqlx::query!(
+                "UPDATE users SET
+                    username = $1,
+                    email = $2,
+                    name = $3,
+                    user_type_id = $4,
+                    account_status_id = $5,
+                    updated_by = $6,
+                    updated_at = NOW()
+                 WHERE id = $7",
+                username,
+                email,
+                name,
+                user_type_id,
+                account_status_id,
+                claims.user_id,
+                id
+            )
+            .execute(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            match result.rows_affected() {
+                0 => {
+                    let response = Response {
+                        msg: String::from("User not updated"),
+                        success: false,
+                    };
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                _ => {
+                    let response = Response {
+                        msg: String::from("User updated successfully"),
+                        success: true,
+                    };
+                    Ok(HttpResponse::Ok().json(response))
+                }
+            }
+        }
+    }
+}
+
+pub async fn update_profile(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    body: UpdateProfileRequestBody,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let result = sqlx::query!(
+        "UPDATE users SET
+            name = $1,
+            bio_info = $2,
+            theme_id = $3,
+            theme_dark_mode = $4,
+            light_theme_primary_colour = $5,
+            light_theme_secondary_colour = $6,
+            light_theme_accent_colour = $7,
+            light_theme_sent_colour = $8,
+            light_theme_received_colour = $9,
+            light_theme_dark_text_colour = $10,
+            light_theme_light_text_colour = $11,
+            dark_theme_primary_colour = $12,
+            dark_theme_secondary_colour = $13,
+            dark_theme_accent_colour = $14,
+            dark_theme_sent_colour = $15,
+            dark_theme_received_colour = $16,
+            dark_theme_dark_text_colour = $17,
+            dark_theme_light_text_colour = $18,
+            updated_at = NOW()
+         WHERE id = $19",
+        body.name,
+        body.bio_info,
+        body.theme_id,
+        body.theme_dark_mode,
+        body.light_theme_primary_colour,
+        body.light_theme_secondary_colour,
+        body.light_theme_accent_colour,
+        body.light_theme_sent_colour,
+        body.light_theme_received_colour,
+        body.light_theme_dark_text_colour,
+        body.light_theme_light_text_colour,
+        body.dark_theme_primary_colour,
+        body.dark_theme_secondary_colour,
+        body.dark_theme_accent_colour,
+        body.dark_theme_sent_colour,
+        body.dark_theme_received_colour,
+        body.dark_theme_dark_text_colour,
+        body.dark_theme_light_text_colour,
+        claims.user_id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match result.rows_affected() {
+        0 => {
+            let response = Response {
+                msg: String::from("Profile not updated"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        _ => {
+            let response = Response {
+                msg: String::from("Profile updated successfully"),
+                success: true,
+            };
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn update_status(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    status_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let result = sqlx::query!(
+        "UPDATE users SET status_id = $1, updated_at = NOW() WHERE id = $2",
+        status_id,
+        claims.user_id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match result.rows_affected() {
+        0 => {
+            let response = Response {
+                msg: String::from("Status not updated"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        _ => {
+            let response = Response {
+                msg: String::from("Status updated successfully"),
+                success: true,
+            };
+            Ok(HttpResponse::Ok().json(response))
         }
     }
 }
 
 pub async fn delete_user(
     data: web::Data<AppState>,
-    admin_id: i64,
+    claims: JwtClaims,
     id: i64,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let pool: sqlx::Pool<sqlx::Postgres> = data.db.to_owned();
+    let pool = data.db.to_owned();
 
-    let get_admin_user = sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", admin_id)
+    let target_user = sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", id)
         .fetch_optional(&pool)
         .await
-        .map_err(|e| {
-            error::ErrorBadRequest(
-                serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match target_user {
+        None => {
+            let response = Response {
+                msg: String::from("User not found"),
+                success: false,
+            };
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(target) => {
+            // Cannot delete a user with higher authority than yourself
+            if claims.user_type_id > target.user_type_id {
+                let response = Response {
+                    msg: String::from(
+                        "You cannot delete a user with higher authority than yourself",
+                    ),
+                    success: false,
+                };
+                return Ok(HttpResponse::Forbidden().json(response));
+            }
+
+            // Only super admin can delete themselves
+            if claims.user_id == id && claims.user_type_id != 1 {
+                let response = Response {
+                    msg: String::from("You cannot delete your own account"),
+                    success: false,
+                };
+                return Ok(HttpResponse::Forbidden().json(response));
+            }
+
+            let mut tx = pool
+                .begin()
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            // Delete messages sent by user
+            sqlx::query!("DELETE FROM messages WHERE sender_id = $1", id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            // Delete group permissions
+            sqlx::query!("DELETE FROM chat_group_permissions WHERE user_id = $1", id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            // Delete groups created by user
+            sqlx::query!("DELETE FROM chat_groups WHERE created_by = $1", id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            // Delete relationships
+            sqlx::query!(
+                "DELETE FROM user_relationships WHERE requester_id = $1 OR receiver_id = $1",
+                id
             )
-        })?;
-
-    if (!get_admin_user.is_none()) {
-        let get_user = sqlx::query!("SELECT id, user_type_id FROM users WHERE id = $1", id)
-            .fetch_optional(&pool)
+            .execute(&mut *tx)
             .await
-            .map_err(|e| {
-                error::ErrorBadRequest(
-                    serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                )
-            })?;
-        if (!get_user.is_none()) {
-            let actual_admin_user = get_admin_user.unwrap();
-            let actual_user = get_user.unwrap();
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (actual_admin_user.user_type_id == 1) {
-                let mut tx = pool.begin().await.map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-
-                let delete_users_page_elements: sqlx::postgres::PgQueryResult = sqlx::query("DELETE FROM page_elements WHERE page_id IN (SELECT id FROM pages WHERE created_by_id = $1)").bind(id).execute(&mut *tx).await.map_err(|e| {
-                error::ErrorBadRequest(
-                    serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                )
-            })?;
-
-                let update_page_remove_css = sqlx::query!(
-                    "UPDATE pages SET selected_css_id = $1 WHERE created_by_id = $2",
-                    None::<i64>,
-                    id
-                )
+            // Delete user
+            let result = sqlx::query!("DELETE FROM users WHERE id = $1", id)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                let delete_users_page_css: sqlx::postgres::PgQueryResult = sqlx::query("DELETE FROM page_css WHERE page_id IN (SELECT id FROM pages WHERE created_by_id = $1)").bind(id).execute(&mut *tx).await.map_err(|e| {
-                error::ErrorBadRequest(
-                    serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                )
-            })?;
+            tx.commit()
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                let delete_users_page_permissions: sqlx::postgres::PgQueryResult = sqlx::query("DELETE FROM page_permissions WHERE page_id IN (SELECT id FROM pages WHERE created_by_id = $1)").bind(id).execute(&mut *tx).await.map_err(|e| {
-                error::ErrorBadRequest(
-                    serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                )
-            })?;
-
-                let delete_users_pages: sqlx::postgres::PgQueryResult =
-                    sqlx::query("DELETE FROM pages WHERE created_by_id = $1")
-                        .bind(id)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| {
-                            error::ErrorBadRequest(
-                                serde_json::to_string(&e.to_string())
-                                    .unwrap_or_else(|_| "{}".to_string()),
-                            )
-                        })?;
-
-                let delete_user: sqlx::postgres::PgQueryResult =
-                    sqlx::query("DELETE FROM users WHERE id = $1")
-                        .bind(id)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| {
-                            error::ErrorBadRequest(
-                                serde_json::to_string(&e.to_string())
-                                    .unwrap_or_else(|_| "{}".to_string()),
-                            )
-                        })?;
-
-                tx.commit().await.map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-
-                if (delete_user.rows_affected() == 0) {
+            match result.rows_affected() {
+                0 => {
                     let response = Response {
-                        msg: String::from("Query failed, no User Deleted, they may not Exist."),
-                        data: None,
+                        msg: String::from("User not deleted"),
                         success: false,
                     };
                     Ok(HttpResponse::BadRequest().json(response))
-                } else {
-                    let response = Response {
-                        msg: String::from("Success"),
-                        data: None,
-                        success: true,
-                    };
-
-                    Ok(HttpResponse::Ok().json(response))
                 }
-            } else if (actual_admin_user.user_type_id == 2
-                && actual_admin_user.id == actual_user.id)
-            {
-                let response = Response {
-                    msg: String::from("User Cannot Delete Themselves, Unless of Course they are a Supereme Administrator, which they are Not, so Stop asking."),
-                    data: None,
-                    success: false,
-                };
-
-                Ok(HttpResponse::Unauthorized().json(response))
-            } else if (actual_admin_user.user_type_id > 2
-                || actual_admin_user.user_type_id > actual_user.user_type_id)
-            {
-                let response = Response {
-                    msg: String::from("User is Unauthorized to Delete this User."),
-                    data: None,
-                    success: false,
-                };
-
-                Ok(HttpResponse::Unauthorized().json(response))
-            } else {
-                let mut tx = pool.begin().await.map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-
-                let delete_users_page_elements: sqlx::postgres::PgQueryResult = sqlx::query("DELETE FROM page_elements WHERE page_id IN (SELECT id FROM pages WHERE created_by_id = $1)").bind(id).execute(&mut *tx).await.map_err(|e| {
-                error::ErrorBadRequest(
-                    serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                )
-            })?;
-
-                let update_page_remove_css = sqlx::query!(
-                    "UPDATE pages SET selected_css_id = $1 WHERE created_by_id = $2",
-                    None::<i64>,
-                    id
-                )
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-
-                let delete_users_page_css: sqlx::postgres::PgQueryResult = sqlx::query("DELETE FROM page_css WHERE page_id IN (SELECT id FROM pages WHERE created_by_id = $1)").bind(id).execute(&mut *tx).await.map_err(|e| {
-                error::ErrorBadRequest(
-                    serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                )
-            })?;
-
-                let delete_users_page_permissions: sqlx::postgres::PgQueryResult = sqlx::query("DELETE FROM page_permissions WHERE page_id IN (SELECT id FROM pages WHERE created_by_id = $1)").bind(id).execute(&mut *tx).await.map_err(|e| {
-                error::ErrorBadRequest(
-                    serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                )
-            })?;
-
-                let delete_users_pages: sqlx::postgres::PgQueryResult =
-                    sqlx::query("DELETE FROM pages WHERE created_by_id = $1")
-                        .bind(id)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| {
-                            error::ErrorBadRequest(
-                                serde_json::to_string(&e.to_string())
-                                    .unwrap_or_else(|_| "{}".to_string()),
-                            )
-                        })?;
-
-                let delete_user: sqlx::postgres::PgQueryResult =
-                    sqlx::query("DELETE FROM users WHERE id = $1")
-                        .bind(id)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| {
-                            error::ErrorBadRequest(
-                                serde_json::to_string(&e.to_string())
-                                    .unwrap_or_else(|_| "{}".to_string()),
-                            )
-                        })?;
-
-                tx.commit().await.map_err(|e| {
-                    error::ErrorBadRequest(
-                        serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "{}".to_string()),
-                    )
-                })?;
-
-                if (delete_user.rows_affected() == 0) {
+                _ => {
                     let response = Response {
-                        msg: String::from("Query failed, no User Deleted, they may not Exist."),
-                        data: None,
-                        success: false,
-                    };
-                    Ok(HttpResponse::BadRequest().json(response))
-                } else {
-                    let response = Response {
-                        msg: String::from("Success"),
-                        data: None,
+                        msg: String::from("User deleted successfully"),
                         success: true,
                     };
-
                     Ok(HttpResponse::Ok().json(response))
                 }
             }
-        } else {
-            let response = Response {
-                msg: String::from("Query failed, User to Delete not found"),
-                data: None,
-                success: false,
-            };
-
-            Ok(HttpResponse::BadRequest().json(response))
         }
-    } else {
-        let response = Response {
-            msg: String::from("Query failed, Admin User not found"),
-            data: None,
-            success: false,
-        };
-
-        Ok(HttpResponse::BadRequest().json(response))
     }
 }
