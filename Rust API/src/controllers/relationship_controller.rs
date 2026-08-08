@@ -12,6 +12,7 @@ struct RelationshipRow {
     receiver_id: i64,
     status_id: i64,
     blocked_by: Option<i64>,
+    declined_by: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -199,7 +200,7 @@ pub async fn update_relationship(
             // Only participants or admin can update
             if (relationship.requester_id != claims.user_id
                 && relationship.receiver_id != claims.user_id
-                && claims.user_type_id > global::ADMIN)
+                && claims.user_type_id > user_type::ADMIN)
             {
                 let response = Response {
                     msg: String::from("You are Not Part of this Relationship"),
@@ -233,8 +234,8 @@ pub async fn update_relationship(
                         .await
                         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                        if (decliner.user_type_id <= global::ADMIN
-                            && claims.user_type_id > global::ADMIN)
+                        if (decliner.user_type_id <= user_type::ADMIN
+                            && claims.user_type_id > user_type::ADMIN)
                         {
                             let response = Response {
                                 msg: String::from(
@@ -263,7 +264,8 @@ pub async fn update_relationship(
             }
 
             // Already declined and trying to decline again — non admins only
-            if (relationship.status_id == 4 && !accepted && claims.user_type_id > global::ADMIN) {
+            if (relationship.status_id == 4 && !accepted && claims.user_type_id > user_type::ADMIN)
+            {
                 let response = Response {
                     msg: String::from("This Friend Request is Already Declined"),
                     success: false,
@@ -273,10 +275,10 @@ pub async fn update_relationship(
             }
 
             // Non admins — only receiver can accept or decline a pending request
-            if (claims.user_type_id > global::ADMIN) {
+            if (claims.user_type_id > user_type::ADMIN) {
                 if (relationship.status_id == 1
                     && relationship.requester_id == claims.user_id
-                    && elationship.receiver_id != claims.user_id)
+                    && relationship.receiver_id != claims.user_id)
                 {
                     let response = Response {
                         msg: String::from(
@@ -301,8 +303,8 @@ pub async fn update_relationship(
 
             // accepted = true  → status 2, clear declined_by to NULL
             // accepted = false → status 4, set declined_by to claims.user_id
-            let new_status: i64 = 0;
-            let declined_by: Option<i64> = Some(0);
+            let mut new_status: i64 = 0;
+            let mut declined_by: Option<i64> = Some(0);
             if (accepted) {
                 new_status = 2;
                 declined_by = None;
@@ -326,7 +328,7 @@ pub async fn update_relationship(
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
             if (result.rows_affected() > 0) {
-                let msg = "";
+                let mut msg = "";
 
                 if (accepted) {
                     msg = "Relationship Accepted Successfully"
@@ -379,7 +381,9 @@ pub async fn block_relationship(
         }
         Some(relationship) => {
             // Only participants can block/unblock
-            if (rel.requester_id != claims.user_id && rel.receiver_id != claims.user_id) {
+            if (relationship.requester_id != claims.user_id
+                && relationship.receiver_id != claims.user_id)
+            {
                 let response = Response {
                     msg: String::from("You are Not Part of this Relationship"),
                     success: false,
@@ -605,8 +609,8 @@ pub async fn delete_relationship(
                         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
                         // If declined by admin — only admin can delete
-                        if (decliner.user_type_id <= global::ADMIN
-                            && claims.user_type_id > global::ADMIN)
+                        if (decliner.user_type_id <= user_type::ADMIN
+                            && claims.user_type_id > user_type::ADMIN)
                         {
                             let response = Response {
                                 msg: String::from(
@@ -621,7 +625,7 @@ pub async fn delete_relationship(
                         // If declined by receiver — only receiver or admin can delete
                         if (declined_by_id == relationship.receiver_id
                             && claims.user_id != relationship.receiver_id
-                            && claims.user_type_id > global::ADMIN)
+                            && claims.user_type_id > user_type::ADMIN)
                         {
                             let response = Response {
                                 msg: String::from(
@@ -638,10 +642,11 @@ pub async fn delete_relationship(
 
             // If blocked — only the blocker or admin can delete
             if (relationship.status_id == 3) {
-                match rel.blocked_by {
+                match relationship.blocked_by {
                     None => {}
                     Some(blocked_by_id) => {
-                        if (blocked_by_id != claims.user_id && claims.user_type_id > global::ADMIN)
+                        if (blocked_by_id != claims.user_id
+                            && claims.user_type_id > user_type::ADMIN)
                         {
                             let response = Response {
                                 msg: String::from(
@@ -657,9 +662,9 @@ pub async fn delete_relationship(
             }
 
             // For pending or accepted — only participants or admin can delete
-            if (rel.requester_id != claims.user_id
-                && rel.receiver_id != claims.user_id
-                && claims.user_type_id > global::ADMIN)
+            if (relationship.requester_id != claims.user_id
+                && relationship.receiver_id != claims.user_id
+                && claims.user_type_id > user_type::ADMIN)
             {
                 let response = Response {
                     msg: String::from("You do Not have a Relationship with this User"),
