@@ -126,20 +126,20 @@ pub async fn register_user(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected() > 0) {
-                let response = Response {
-                    msg: String::from("Used Registration failed"),
-                    success: false,
-                };
-
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
+            if (result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("Registration successful"),
                     success: true,
                 };
 
                 Ok(HttpResponse::Ok().json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("Used Registration failed"),
+                    success: false,
+                };
+
+                Ok(HttpResponse::BadRequest().json(response))
             }
         }
     }
@@ -269,7 +269,7 @@ pub async fn login_user(
                                             msg: String::from("Login Successful"),
                                             access_token: Some(access_token),
                                             user: Some(user),
-                                            themes: Some(_themes),
+                                            themes: Some(themes),
                                             success: true,
                                         };
 

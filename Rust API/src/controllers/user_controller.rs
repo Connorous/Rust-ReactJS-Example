@@ -94,7 +94,7 @@ pub async fn list_users(
     let users = sqlx::query_as!(
         UserManageRow,
         "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
-                status_id, is_online, 
+                status_id, is_online 
          FROM users ORDER BY id"
     )
     .fetch_all(&pool)
