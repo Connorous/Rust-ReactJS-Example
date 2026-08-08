@@ -496,10 +496,12 @@ pub async fn block_relationship(
                             if (blocked_by_id != claims.user_id) {
                                 let response = Response {
                                     msg: String::from(
-                                        "You Cannot Unblock a User You did Not Block",
+                                        "You Cannot Unblock A User You did Not Block",
                                     ),
                                     success: false,
                                 };
+
+                                return Ok(HttpResponse::Forbidden().json(response));
                             }
                         }
                     }
