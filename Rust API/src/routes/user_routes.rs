@@ -30,7 +30,6 @@ pub struct GetUserRequestBody {
 
 #[derive(Deserialize, Clone)]
 pub struct UpdateProfileRequestBody {
-    pub name: String,
     pub bio_info: Option<String>,
     pub theme_id: Option<i64>,
     pub theme_dark_mode: bool,
@@ -185,7 +184,7 @@ pub async fn logout_user(
     data: web::Data<AppState>,
     claims: RequireGlobal<{ global::VIEWER }, { errors::DEFAULT }>,
 ) -> HttpResponse {
-    let result: HttpResponse = match user_controller::logout_user(data, claims.0).await {
+    let result: HttpResponse = match user_controller::logout_user(data, claims.0.id).await {
         Ok(res) => res,
         Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
     };

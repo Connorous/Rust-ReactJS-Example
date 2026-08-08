@@ -22,37 +22,8 @@ struct DataResponse<T: Serialize> {
     success: bool,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
-struct UserRow {
-    id: i64,
-    username: String,
-    name: String,
-    email: String,
-    bio_info: Option<String>,
-    user_type_id: i64,
-    account_status_id: i64,
-    status_id: Option<i64>,
-    is_online: bool,
-    theme_id: Option<i64>,
-    theme_dark_mode: bool,
-    light_theme_primary_colour: String,
-    light_theme_secondary_colour: String,
-    light_theme_accent_colour: String,
-    light_theme_sent_colour: String,
-    light_theme_received_colour: String,
-    light_theme_dark_text_colour: String,
-    light_theme_light_text_colour: String,
-    dark_theme_primary_colour: String,
-    dark_theme_secondary_colour: String,
-    dark_theme_accent_colour: String,
-    dark_theme_sent_colour: String,
-    dark_theme_received_colour: String,
-    dark_theme_dark_text_colour: String,
-    dark_theme_light_text_colour: String,
-}
-
 #[derive(Debug, Clone, Serialize)]
-struct LoggedInUser {
+struct User {
     id: i64,
     username: String,
     name: String,
@@ -90,7 +61,7 @@ struct Theme {
 struct LoginResponse {
     msg: String,
     access_token: Option<String>,
-    user: Option<LoggedInUser>,
+    user: Option<User>,
     themes: Option<Vec<Theme>>,
     success: bool,
 }
@@ -99,36 +70,6 @@ struct LoginResponse {
 
 fn empty_string_check(fields: Vec<&str>) -> bool {
     fields.iter().any(|f| f.trim().is_empty())
-}
-
-fn user_row_to_logged_in(user: UserRow) -> LoggedInUser {
-    LoggedInUser {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        email: user.email,
-        bio_info: user.bio_info,
-        user_type_id: user.user_type_id,
-        account_status_id: user.account_status_id,
-        status_id: user.status_id,
-        is_online: user.is_online,
-        theme_id: user.theme_id,
-        theme_dark_mode: user.theme_dark_mode,
-        light_theme_primary_colour: user.light_theme_primary_colour,
-        light_theme_secondary_colour: user.light_theme_secondary_colour,
-        light_theme_accent_colour: user.light_theme_accent_colour,
-        light_theme_sent_colour: user.light_theme_sent_colour,
-        light_theme_received_colour: user.light_theme_received_colour,
-        light_theme_dark_text_colour: user.light_theme_dark_text_colour,
-        light_theme_light_text_colour: user.light_theme_light_text_colour,
-        dark_theme_primary_colour: user.dark_theme_primary_colour,
-        dark_theme_secondary_colour: user.dark_theme_secondary_colour,
-        dark_theme_accent_colour: user.dark_theme_accent_colour,
-        dark_theme_sent_colour: user.dark_theme_sent_colour,
-        dark_theme_received_colour: user.dark_theme_received_colour,
-        dark_theme_dark_text_colour: user.dark_theme_dark_text_colour,
-        dark_theme_light_text_colour: user.dark_theme_light_text_colour,
-    }
 }
 
 // --- CONTROLLERS ---
@@ -142,7 +83,7 @@ pub async fn register_user(
 ) -> Result<HttpResponse, actix_web::Error> {
     if empty_string_check(vec![&username, &email, &name, &password]) {
         let response = Response {
-            msg: String::from("Username, Email, Name or Password must not be empty"),
+            msg: String::from("Username, Email, Name or Password must Not be empty"),
             success: false,
         };
         return Ok(HttpResponse::BadRequest().json(response));
@@ -160,18 +101,19 @@ pub async fn register_user(
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     match existing {
-        Some(_) => {
+        Some(_existing_user) => {
             let response = Response {
                 msg: String::from("Username or Email is already in use"),
                 success: false,
             };
+
             Ok(HttpResponse::BadRequest().json(response))
         }
         None => {
             let hashed_password = hash_password(&password);
 
             let result = sqlx::query!(
-                "INSERT INTO users (username, email, name, password_hash, user_type_id, account_status_id)
+                "INSERT INTO users (username, email, name, password, user_type_id, account_status_id)
                  VALUES ($1, $2, $3, $4, $5, $6)",
                 username,
                 email,
@@ -184,21 +126,20 @@ pub async fn register_user(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            match result.rows_affected() {
-                0 => {
-                    let response = Response {
-                        msg: String::from("Registration failed"),
-                        success: false,
-                    };
-                    Ok(HttpResponse::BadRequest().json(response))
-                }
-                _ => {
-                    let response = Response {
-                        msg: String::from("Registration successful"),
-                        success: true,
-                    };
-                    Ok(HttpResponse::Ok().json(response))
-                }
+            if (!result.rows_affected > 0) {
+                let response = Response {
+                    msg: String::from("Used Registration failed"),
+                    success: false,
+                };
+
+                Ok(HttpResponse::BadRequest().json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("Registration successful"),
+                    success: true,
+                };
+
+                Ok(HttpResponse::Ok().json(response))
             }
         }
     }
@@ -211,7 +152,7 @@ pub async fn login_user(
 ) -> Result<HttpResponse, actix_web::Error> {
     if empty_string_check(vec![&username, &password]) {
         let response = Response {
-            msg: String::from("Username or Password must not be empty"),
+            msg: String::from("Username or Password must Not be empty"),
             success: false,
         };
         return Ok(HttpResponse::BadRequest().json(response));
@@ -220,7 +161,7 @@ pub async fn login_user(
     let pool = data.db.to_owned();
 
     let user = sqlx::query_as!(
-        UserRow,
+        User,
         "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
                 status_id, is_online, theme_id, theme_dark_mode,
                 light_theme_primary_colour, light_theme_secondary_colour,
@@ -240,7 +181,7 @@ pub async fn login_user(
     match user {
         None => {
             let response = LoginResponse {
-                msg: String::from("Username not found"),
+                msg: String::from("User Not found, check your login details."),
                 access_token: None,
                 user: None,
                 themes: None,
@@ -249,38 +190,40 @@ pub async fn login_user(
             Ok(HttpResponse::BadRequest().json(response))
         }
         Some(user) => {
-            let auth_row = sqlx::query!(
-                "SELECT password_hash, account_status_id FROM users WHERE id = $1",
+            let auth_details = sqlx::query!(
+                "SELECT password, account_status_id FROM users WHERE id = $1",
                 user.id
             )
-            .fetch_one(&pool)
+            .fetch_optional(&pool)
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if auth_row.account_status_id != 1 {
-                let response = LoginResponse {
-                    msg: String::from("Account is suspended or closed"),
-                    access_token: None,
-                    user: None,
-                    themes: None,
-                    success: false,
-                };
-                return Ok(HttpResponse::Unauthorized().json(response));
-            }
+            match auth_details {
+                Some(auth_details) => {
+                    if auth_details.account_status_id != 1 {
+                        let response: LoginResponse = LoginResponse {
+                            msg: String::from("Account is suspended or closed"),
+                            access_token: None,
+                            user: None,
+                            themes: None,
+                            success: false,
+                        };
+                        return Ok(HttpResponse::Unauthorized().json(response));
+                    }
 
-            match verify_password(&password, &auth_row.password_hash) {
-                Ok(_) => {
-                    let access_token = generate_access_token(
-                        user.username.clone(),
-                        user.id,
-                        user.user_type_id,
-                        user.account_status_id,
-                    );
-                    let refresh_token = generate_refresh_token();
-                    let refresh_expires = Utc::now() + Duration::days(7);
+                    match verify_password(&password, &auth_details.password_hash) {
+                        Ok(_) => {
+                            let access_token = generate_access_token(
+                                user.username.clone(),
+                                user.id,
+                                user.user_type_id,
+                                user.account_status_id,
+                            );
+                            let refresh_token = generate_refresh_token();
+                            let refresh_expires = Utc::now() + Duration::days(7);
 
-                    sqlx::query!(
-                        "UPDATE users SET
+                            let update_token = sqlx::query!(
+                                "UPDATE users SET
                             refresh_token = $1,
                             refresh_token_expires_at = $2,
                             refresh_token_created_at = COALESCE(refresh_token_created_at, NOW()),
@@ -288,34 +231,51 @@ pub async fn login_user(
                             is_online = TRUE,
                             status_id = 1
                          WHERE id = $3",
-                        refresh_token,
-                        refresh_expires,
-                        user.id
-                    )
-                    .execute(&pool)
-                    .await
-                    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+                                refresh_token,
+                                refresh_expires,
+                                user.id
+                            )
+                            .execute(&pool)
+                            .await
+                            .map_err(|e| {
+                                actix_web::error::ErrorInternalServerError(e.to_string())
+                            })?;
 
-                    let themes = sqlx::query_as!(Theme, "SELECT id, theme FROM themes ORDER BY id")
-                        .fetch_all(&pool)
-                        .await
-                        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+                            let themes =
+                                sqlx::query_as!(Theme, "SELECT id, theme FROM themes ORDER BY id")
+                                    .fetch_all(&pool)
+                                    .await
+                                    .map_err(|e| {
+                                        actix_web::error::ErrorInternalServerError(e.to_string())
+                                    })?;
 
-                    let response = LoginResponse {
-                        msg: String::from("Login successful"),
-                        access_token: Some(access_token),
-                        user: Some(user_row_to_logged_in(user)),
-                        themes: Some(themes),
-                        success: true,
-                    };
+                            let response = LoginResponse {
+                                msg: String::from("Login successful"),
+                                access_token: Some(access_token),
+                                user: Some(user),
+                                themes: Some(themes),
+                                success: true,
+                            };
 
-                    Ok(HttpResponse::Ok()
-                        .cookie(build_refresh_cookie(refresh_token))
-                        .json(response))
+                            Ok(HttpResponse::Ok()
+                                .cookie(build_refresh_cookie(refresh_token))
+                                .json(response))
+                        }
+                        Err(_) => {
+                            let response = LoginResponse {
+                                msg: String::from("Incorrect password"),
+                                access_token: None,
+                                user: None,
+                                themes: None,
+                                success: false,
+                            };
+                            Ok(HttpResponse::Unauthorized().json(response))
+                        }
+                    }
                 }
-                Err(_) => {
+                None => {
                     let response = LoginResponse {
-                        msg: String::from("Incorrect password"),
+                        msg: String::from("User Authentication Not Found"),
                         access_token: None,
                         user: None,
                         themes: None,
@@ -416,7 +376,7 @@ pub async fn refresh_token(
             let new_refresh_token = generate_refresh_token();
             let new_refresh_expires = Utc::now() + Duration::days(7);
 
-            sqlx::query!(
+            result = sqlx::query!(
                 "UPDATE users SET
                     refresh_token = $1,
                     refresh_token_expires_at = $2,
@@ -430,15 +390,23 @@ pub async fn refresh_token(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            let response = DataResponse {
-                msg: String::from("Token refreshed"),
-                data: new_access_token,
-                success: true,
-            };
+            if (!result.rows_affected > 0) {
+                let response = Response {
+                    msg: String::from("User Token Update Failed"),
+                    success: false,
+                };
+                Ok(HttpResponse::BadRequest().json(response))
+            } else {
+                let response = DataResponse {
+                    msg: String::from("Token refreshed"),
+                    data: new_access_token,
+                    success: true,
+                };
 
-            Ok(HttpResponse::Ok()
-                .cookie(build_refresh_cookie(new_refresh_token))
-                .json(response))
+                Ok(HttpResponse::Ok()
+                    .cookie(build_refresh_cookie(new_refresh_token))
+                    .json(response))
+            }
         }
     }
 }
@@ -449,7 +417,7 @@ pub async fn logout_user(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    sqlx::query!(
+    result = sqlx::query!(
         "UPDATE users SET
             refresh_token = NULL,
             refresh_token_expires_at = NULL,
@@ -463,14 +431,23 @@ pub async fn logout_user(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    let response = Response {
-        msg: String::from("Logged out successfully"),
-        success: true,
-    };
+    if (!result.rows_affected > 0) {
+        let response = Response {
+            msg: String::from("User Token Update Failed"),
+            success: false,
+        };
 
-    Ok(HttpResponse::Ok()
-        .cookie(clear_refresh_cookie())
-        .json(response))
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = Response {
+            msg: String::from("Logged out successfully"),
+            success: true,
+        };
+
+        Ok(HttpResponse::Ok()
+            .cookie(clear_refresh_cookie())
+            .json(response))
+    }
 }
 
 pub async fn reset_user_password(
@@ -481,7 +458,7 @@ pub async fn reset_user_password(
 ) -> Result<HttpResponse, actix_web::Error> {
     if empty_string_check(vec![&username, &email, &password]) {
         let response = Response {
-            msg: String::from("Username, Email or Password must not be empty"),
+            msg: String::from("Username, Email or Password must Not be empty"),
             success: false,
         };
         return Ok(HttpResponse::BadRequest().json(response));
@@ -510,7 +487,7 @@ pub async fn reset_user_password(
             let hashed_password = hash_password(&password);
 
             let result = sqlx::query!(
-                "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+                "UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2",
                 hashed_password,
                 user.id
             )
@@ -518,21 +495,19 @@ pub async fn reset_user_password(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            match result.rows_affected() {
-                0 => {
-                    let response = Response {
-                        msg: String::from("Password reset failed"),
-                        success: false,
-                    };
-                    Ok(HttpResponse::BadRequest().json(response))
-                }
-                _ => {
-                    let response = Response {
-                        msg: String::from("Password reset successful"),
-                        success: true,
-                    };
-                    Ok(HttpResponse::Ok().json(response))
-                }
+            if (!result.rows_affected > 0) {
+                let response = Response {
+                    msg: String::from("Password reset failed"),
+                    success: false,
+                };
+                Ok(HttpResponse::BadRequest().json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("Password reset successful"),
+                    success: true,
+                };
+
+                Ok(HttpResponse::Ok().json(response))
             }
         }
     }

@@ -43,7 +43,7 @@ CREATE TABLE users (
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
+    password TEXT NOT NULL,
     bio_info TEXT,
     user_type_id INT NOT NULL REFERENCES user_types(id) DEFAULT 4,
     account_status_id INT NOT NULL REFERENCES account_statuses(id) DEFAULT 1,
@@ -98,7 +98,7 @@ CREATE TABLE user_relationships (
 CREATE TABLE chat_groups (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    created_by BIGINT NOT NULL REFERENCES users(id),
+    owner_id BIGINT NOT NULL REFERENCES users(id),
     updated_by BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
