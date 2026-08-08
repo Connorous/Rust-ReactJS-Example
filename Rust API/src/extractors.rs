@@ -9,7 +9,7 @@ use std::pin::Pin;
 
 // --- GLOBAL PERMISSION CONSTANTS ---
 
-pub mod global {
+pub mod user_type {
     pub const SUPER_ADMIN: i64 = 1;
     pub const ADMIN: i64 = 2;
     pub const STANDARD_USER: i64 = 3;
@@ -17,7 +17,7 @@ pub mod global {
     pub const BLOCKED: i64 = 5;
 }
 
-pub mod group {
+pub mod group_permission {
     pub const MODERATOR: i64 = 1;
     pub const MEMBER: i64 = 2;
     pub const VIEWER: i64 = 3;
@@ -61,6 +61,7 @@ pub mod errors {
     pub const UPDATE_RELATIONSHIP: u8 = 31;
     pub const DELETE_RELATIONSHIP: u8 = 32;
     pub const LIST_RELATIONSHIPS: u8 = 33;
+    pub const LIST_RELATIONSHIPS_ADMIN: u8 = 34;
 
     // Message ownership
     pub const UPDATE_MESSAGE_NOT_OWNER: u8 = 40;
@@ -107,7 +108,10 @@ pub fn permission_error_message(err_code: u8) -> &'static str {
         errors::SEND_FRIEND_REQUEST => "You lack permissions to send friend requests",
         errors::UPDATE_RELATIONSHIP => "You lack permissions to update this relationship",
         errors::DELETE_RELATIONSHIP => "You lack permissions to delete this relationship",
-        errors::LIST_RELATIONSHIPS => "You lack permissions to list relationships",
+        errors::LIST_RELATIONSHIPS => "You lack permissions to see a list of your relationships",
+        errors::LIST_RELATIONSHIPS_ADMIN => {
+            "You lack permissions to see a list of this user's relationships"
+        }
 
         // Message ownership
         errors::UPDATE_MESSAGE_NOT_OWNER => "You cannot edit a message you did not send",

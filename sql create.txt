@@ -90,6 +90,7 @@ CREATE TABLE user_relationships (
     receiver_id BIGINT NOT NULL REFERENCES users(id),
     status_id INT NOT NULL REFERENCES relationship_statuses(id) DEFAULT 1,
     blocked_by BIGINT REFERENCES users(id),
+    declined_by BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(requester_id, receiver_id)
@@ -135,7 +136,7 @@ INSERT INTO user_types (type) VALUES ('Supreme Administrator'), ('Admin'), ('Sta
 INSERT INTO account_statuses (status) VALUES ('Active'), ('Suspended'), ('Closed');
 INSERT INTO user_statuses (status) VALUES ('Online'), ('Idle'), ('Do Not Disturb'), ('Offline');
 INSERT INTO themes (theme) VALUES ('Default'), ('Rounded'), ('Sharp'), ('Gothic'), ('Times Roman');
-INSERT INTO relationship_statuses (status) VALUES ('Pending'), ('Accepted'), ('Blocked');
+INSERT INTO relationship_statuses (status) VALUES ('Pending'), ('Accepted'), ('Blocked'), ('Declined');
 INSERT INTO chat_group_permission_types (permission_type) VALUES ('Moderator'), ('Member'), ('Viewer'), ('Blocked');
 
 

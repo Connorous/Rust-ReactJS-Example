@@ -1,5 +1,5 @@
 use crate::controllers::user_controller;
-use crate::extractors::{errors, global, RequireGlobal};
+use crate::extractors::{errors, user_type, RequireGlobal};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
@@ -61,7 +61,7 @@ pub struct DeleteUserRequestBody {
 
 pub async fn list_users(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::ADMIN }, { errors::LIST_USERS }>,
+    claims: RequireGlobal<{ user_type::ADMIN }, { errors::LIST_USERS }>,
 ) -> HttpResponse {
     let result: HttpResponse = match user_controller::list_users(data, claims.0).await {
         Ok(res) => res,
@@ -73,7 +73,7 @@ pub async fn list_users(
 
 pub async fn list_user_types(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::ADMIN }, { errors::LIST_USER_TYPES }>,
+    claims: RequireGlobal<{ user_type::ADMIN }, { errors::LIST_USER_TYPES }>,
 ) -> HttpResponse {
     let result: HttpResponse = match user_controller::list_user_types(data, claims.0).await {
         Ok(res) => res,
@@ -85,7 +85,7 @@ pub async fn list_user_types(
 
 pub async fn get_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::GET_USER }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::GET_USER }>,
     json: web::Json<GetUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -100,7 +100,7 @@ pub async fn get_user(
 
 pub async fn new_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::ADMIN }, { errors::CREATE_USER }>,
+    claims: RequireGlobal<{ user_type::ADMIN }, { errors::CREATE_USER }>,
     json: web::Json<NewUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -125,7 +125,7 @@ pub async fn new_user(
 
 pub async fn update_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::ADMIN }, { errors::UPDATE_USER }>,
+    claims: RequireGlobal<{ user_type::ADMIN }, { errors::UPDATE_USER }>,
     json: web::Json<UpdateUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -151,7 +151,7 @@ pub async fn update_user(
 
 pub async fn update_profile(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::UPDATE_PROFILE }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::UPDATE_PROFILE }>,
     json: web::Json<UpdateProfileRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -166,7 +166,7 @@ pub async fn update_profile(
 
 pub async fn update_status(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::UPDATE_STATUS }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::UPDATE_STATUS }>,
     json: web::Json<UpdateStatusRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -182,7 +182,7 @@ pub async fn update_status(
 
 pub async fn logout_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::DEFAULT }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::DEFAULT }>,
 ) -> HttpResponse {
     let result: HttpResponse = match user_controller::logout_user(data, claims.0.user_id).await {
         Ok(res) => res,
@@ -194,7 +194,7 @@ pub async fn logout_user(
 
 pub async fn delete_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::ADMIN }, { errors::DELETE_USER }>,
+    claims: RequireGlobal<{ user_type::ADMIN }, { errors::DELETE_USER }>,
     json: web::Json<DeleteUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();

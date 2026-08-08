@@ -4,6 +4,7 @@ mod chat_group_routes;
 mod direct_message_routes;
 mod login_routes;
 mod relationship_routes;
+mod relationship_routes;
 mod user_routes;
 mod ws_routes;
 

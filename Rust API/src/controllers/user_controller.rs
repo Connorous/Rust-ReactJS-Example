@@ -93,9 +93,7 @@ pub async fn list_users(
 
     let users = sqlx::query_as!(
         UserManageRow,
-        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
-                status_id, is_online 
-         FROM users ORDER BY id"
+        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users ORDER BY id"
     )
     .fetch_all(&pool)
     .await
@@ -209,20 +207,22 @@ pub async fn new_user(
     password: String,
     user_type_id: i64,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if empty_string_check(vec![&username, &email, &name, &password]) {
+    if (empty_string_check(vec![&username, &email, &name, &password])) {
         let response = Response {
             msg: String::from("Username, Email, Name or Password must Not be empty"),
             success: false,
         };
+
         return Ok(HttpResponse::BadRequest().json(response));
     }
 
     // Cannot create a user with higher authority than yourself
-    if claims.user_type_id > user_type_id {
+    if (claims.user_type_id > user_type_id) {
         let response = Response {
             msg: String::from("You Cannot Create a User with Greater Permissions than Yourself"),
             success: false,
         };
+
         return Ok(HttpResponse::Forbidden().json(response));
     }
 
@@ -243,6 +243,7 @@ pub async fn new_user(
                 msg: String::from("Username or Email is already in use"),
                 success: false,
             };
+
             Ok(HttpResponse::BadRequest().json(response))
         }
         None => {
@@ -294,11 +295,12 @@ pub async fn update_user(
     user_type_id: i64,
     account_status_id: i64,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if empty_string_check(vec![&username, &email, &name]) {
+    if (empty_string_check(vec![&username, &email, &name])) {
         let response = Response {
             msg: String::from("Username, Email or Name must Not be empty"),
             success: false,
         };
+
         return Ok(HttpResponse::BadRequest().json(response));
     }
 
@@ -316,26 +318,29 @@ pub async fn update_user(
                 msg: String::from("User Not Found"),
                 success: false,
             };
+
             Ok(HttpResponse::BadRequest().json(response))
         }
         Some(target) => {
             // Cannot update a user with higher authority than yourself
-            if claims.user_type_id > target.user_type_id {
+            if (claims.user_type_id > target.user_type_id) {
                 let response = Response {
                     msg: String::from(
                         "You Cannot Update a User with Greater Permissions than Yourself",
                     ),
                     success: false,
                 };
+
                 return Ok(HttpResponse::Forbidden().json(response));
             }
 
             // Cannot set a user to a type with higher authority than yourself
-            if claims.user_type_id > user_type_id {
+            if (claims.user_type_id > user_type_id) {
                 let response = Response {
                     msg: String::from("You Cannot Update a User to a Type Greater than Yourself"),
                     success: false,
                 };
+
                 return Ok(HttpResponse::Forbidden().json(response));
             }
 
@@ -538,22 +543,24 @@ pub async fn delete_user(
                 msg: String::from("User Not Found"),
                 success: false,
             };
+
             Ok(HttpResponse::BadRequest().json(response))
         }
         Some(target) => {
             // Cannot delete a user with higher authority than yourself
-            if claims.user_type_id > target.user_type_id {
+            if (claims.user_type_id > target.user_type_id) {
                 let response = Response {
                     msg: String::from(
                         "You Cannot Delete a User with Greater Permissions than Yourself",
                     ),
                     success: false,
                 };
+
                 return Ok(HttpResponse::Forbidden().json(response));
             }
 
             // Only super admin can delete themselves
-            if claims.user_id == id && claims.user_type_id != 1 {
+            if (claims.user_id == id && claims.user_type_id != 1) {
                 let response = Response {
                     msg: String::from("You Cannot Delete Your Own Account"),
                     success: false,

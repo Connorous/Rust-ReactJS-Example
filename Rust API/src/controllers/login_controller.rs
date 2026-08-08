@@ -81,7 +81,7 @@ pub async fn register_user(
     name: String,
     password: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if empty_string_check(vec![&username, &email, &name, &password]) {
+    if (empty_string_check(vec![&username, &email, &name, &password])) {
         let response = Response {
             msg: String::from("Username, Email, Name or Password must Not be empty"),
             success: false,
@@ -150,7 +150,7 @@ pub async fn login_user(
     username: String,
     password: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if empty_string_check(vec![&username, &password]) {
+    if (empty_string_check(vec![&username, &password])) {
         let response = Response {
             msg: String::from("Username or Password must Not be empty"),
             success: false,
@@ -200,7 +200,7 @@ pub async fn login_user(
 
             match auth_details {
                 Some(auth_details) => {
-                    if auth_details.account_status_id != 1 {
+                    if (auth_details.account_status_id != 1) {
                         let response: LoginResponse = LoginResponse {
                             msg: String::from("Account is suspended or closed"),
                             access_token: None,
@@ -354,7 +354,7 @@ pub async fn refresh_token(
             Ok(HttpResponse::Unauthorized().json(response))
         }
         Some(user) => {
-            let expires_at = match user.refresh_token_expires_at {
+            let expires_at_time = match user.refresh_token_expires_at {
                 Some(exp) => exp,
                 None => {
                     let response = Response {
@@ -365,7 +365,7 @@ pub async fn refresh_token(
                 }
             };
 
-            if Utc::now() > expires_at {
+            if (Utc::now() > expires_at_time) {
                 sqlx::query!(
                     "UPDATE users SET
                         refresh_token = NULL,
@@ -387,7 +387,7 @@ pub async fn refresh_token(
                     .json(response));
             }
 
-            if user.account_status_id != 1 {
+            if (user.account_status_id != 1) {
                 let response = Response {
                     msg: String::from("Account is suspended or closed"),
                     success: false,
@@ -487,7 +487,7 @@ pub async fn reset_user_password(
     email: String,
     password: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if empty_string_check(vec![&username, &email, &password]) {
+    if (empty_string_check(vec![&username, &email, &password])) {
         let response = Response {
             msg: String::from("Username, Email or Password must Not be empty"),
             success: false,
