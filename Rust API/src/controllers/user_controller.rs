@@ -52,7 +52,7 @@ struct User {
     dark_theme_light_text_colour: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct UserManageRow {
     id: i64,
     username: String,
@@ -93,8 +93,8 @@ pub async fn list_users(
 
     let users = sqlx::query_as!(
         UserManageRow,
-        "SELECT id, username, name, email, user_type_id, account_status_id,
-                status_id, is_online
+        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
+                status_id, is_online, 
          FROM users ORDER BY id"
     )
     .fetch_all(&pool)
@@ -265,7 +265,7 @@ pub async fn new_user(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected() > 0) {
+            if (result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("User Created Successfully"),
                     success: true,
@@ -567,7 +567,7 @@ pub async fn delete_user(
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!owned_groups.is_empty()) {
+            if (!(owned_groups.is_empty())) {
                 let response = Response {
                     msg: String::from(
                         "User Cannot be Deleted if they are the Owner of One or More Groups",
