@@ -410,7 +410,7 @@ pub async fn logout_user(
             success: true,
         };
 
-        k(HttpResponse::Ok()
+        Ok(HttpResponse::Ok()
             .cookie(clear_refresh_cookie())
             .json(response))
     }
@@ -425,26 +425,25 @@ pub async fn update_profile(
 
     let result = sqlx::query!(
         "UPDATE users SET
-            name = $1,
-            bio_info = $2,
-            theme_id = $3,
-            theme_dark_mode = $4,
-            light_theme_primary_colour = $5,
-            light_theme_secondary_colour = $6,
-            light_theme_accent_colour = $7,
-            light_theme_sent_colour = $8,
-            light_theme_received_colour = $9,
-            light_theme_dark_text_colour = $10,
-            light_theme_light_text_colour = $11,
-            dark_theme_primary_colour = $12,
-            dark_theme_secondary_colour = $13,
-            dark_theme_accent_colour = $14,
-            dark_theme_sent_colour = $15,
-            dark_theme_received_colour = $16,
-            dark_theme_dark_text_colour = $17,
-            dark_theme_light_text_colour = $18,
+            bio_info = $1,
+            theme_id = $2,
+            theme_dark_mode = $3,
+            light_theme_primary_colour = $4,
+            light_theme_secondary_colour = $5,
+            light_theme_accent_colour = $6,
+            light_theme_sent_colour = $7,
+            light_theme_received_colour = $8,
+            light_theme_dark_text_colour = $9,
+            light_theme_light_text_colour = $10,
+            dark_theme_primary_colour = $11,
+            dark_theme_secondary_colour = $12,
+            dark_theme_accent_colour = $13,
+            dark_theme_sent_colour = $14,
+            dark_theme_received_colour = $15,
+            dark_theme_dark_text_colour = $16,
+            dark_theme_light_text_colour = $17,
             updated_at = NOW()
-         WHERE id = $19",
+         WHERE id = $18",
         body.bio_info,
         body.theme_id,
         body.theme_dark_mode,
@@ -560,7 +559,7 @@ pub async fn delete_user(
                 return Ok(HttpResponse::Forbidden().json(response));
             }
 
-            let owned_groups = sqlx::query!()
+            let owned_groups = sqlx::query!("SELECT id FROM chat_groups WHERE owner_id = $1", id)
                 .fetch_all(&pool)
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;

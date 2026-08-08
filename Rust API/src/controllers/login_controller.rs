@@ -211,7 +211,7 @@ pub async fn login_user(
                         return Ok(HttpResponse::Unauthorized().json(response));
                     }
 
-                    match verify_password(&password, &auth_details.password_hash) {
+                    match verify_password(&password, &auth_details.password) {
                         Ok(_) => {
                             let access_token = generate_access_token(
                                 user.username.clone(),
