@@ -1,5 +1,3 @@
-use std::ptr::null;
-
 use crate::state::AppState;
 use crate::{auth::JwtClaims, extractors::user_type};
 use actix_web::{web, HttpResponse};
@@ -36,7 +34,7 @@ pub async fn list_relationships(
 
     let relationships = sqlx::query_as!(
         RelationshipRow,
-        "SELECT id, requester_id, receiver_id, status_id, blocked_by
+        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
          FROM user_relationships
          WHERE requester_id = $1 OR receiver_id = $1
          ORDER BY id",
@@ -73,7 +71,7 @@ pub async fn list_user_relationships(
 
     let relationships = sqlx::query_as!(
         RelationshipRow,
-        "SELECT id, requester_id, receiver_id, status_id, blocked_by
+        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
          FROM user_relationships
          WHERE requester_id = $1 OR receiver_id = $1
          ORDER BY id",
@@ -477,18 +475,8 @@ pub async fn block_relationship(
             } else {
                 // Unblocking
 
-                // Cannot unblock a pending relationship
-                if (relationship.status_id == 1 || relationship.status_id == 2) {
-                    let response = Response {
-                        msg: String::from("This Relationship is Not Blocked"),
-                        success: false,
-                    };
-
-                    return Ok(HttpResponse::Forbidden().json(response));
-                }
-
-                // Cannot unblock a accepted or declined relationship
-                if (relationship.status_id == 2 || relationship.status_id == 4) {
+                // Cannot unblock a pending, accepted or declined relationship
+                if (relationship.status_id != 3) {
                     let response = Response {
                         msg: String::from("This Relationship is Not Blocked"),
                         success: false,
@@ -506,23 +494,12 @@ pub async fn block_relationship(
                         Some(blocked_by_id) => {
                             // Only the blocker can unblock
                             if (blocked_by_id != claims.user_id) {
-                                if (relationship.requester_id == claims.user_id) {
-                                    let response = Response {
-                                        msg: String::from("You Cannot Unblock Yourself"),
-                                        success: false,
-                                    };
-
-                                    return Ok(HttpResponse::Forbidden().json(response));
-                                } else if (relationship.requester_id != claims.user_id) {
-                                    let response = Response {
-                                        msg: String::from(
-                                            "You Cannot Unblock a Relationship you are Not Part of",
-                                        ),
-                                        success: false,
-                                    };
-
-                                    return Ok(HttpResponse::Forbidden().json(response));
-                                }
+                                let response = Response {
+                                    msg: String::from(
+                                        "You Cannot Unblock a User You did Not Block",
+                                    ),
+                                    success: false,
+                                };
                             }
                         }
                     }
