@@ -221,7 +221,7 @@ impl<const LEVEL: i64, const ERR: u8> FromRequest for RequireGlobal<LEVEL, ERR> 
             };
 
             // Reject blocked users
-            if claims.user_type_id == global::BLOCKED {
+            if claims.user_type_id == user_type::BLOCKED {
                 return Err(ErrorForbidden("Account is blocked"));
             }
 
@@ -268,7 +268,7 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
             };
 
             // Reject blocked users
-            if claims.user_type_id == global::BLOCKED {
+            if claims.user_type_id == user_type::BLOCKED {
                 return Err(ErrorForbidden("Account is blocked"));
             }
 
@@ -283,10 +283,10 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
             }
 
             // Admins and super admins bypass group check entirely
-            if claims.user_type_id <= global::ADMIN {
+            if claims.user_type_id <= user_type::ADMIN {
                 return Ok(RequireGroup {
                     claims,
-                    group_permission: group::MODERATOR,
+                    group_permission: group_permission::MODERATOR,
                 });
             }
 
@@ -336,7 +336,7 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
             };
 
             // Reject blocked group members
-            if group_permission == group::BLOCKED {
+            if group_permission == group_permission::BLOCKED {
                 return Err(ErrorForbidden("You are blocked in this group"));
             }
 
@@ -367,10 +367,10 @@ pub fn check_can_delete_message(
 ) -> bool {
     let is_sender = sender_id == user_id;
 
-    let is_global_admin = user_type_id <= global::ADMIN;
+    let is_global_admin = user_type_id <= user_type::ADMIN;
 
     let is_group_moderator = match group_permission {
-        Some(p) => p <= group::MODERATOR,
+        Some(p) => p <= group_permission::MODERATOR,
         None => false,
     };
 

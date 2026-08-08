@@ -1,5 +1,5 @@
 use crate::controllers::chat_group_controller;
-use crate::extractors::{errors, global, group, RequireGlobal, RequireGroup};
+use crate::extractors::{errors, group_permission, user_type, RequireGlobal, RequireGroup};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
@@ -76,7 +76,7 @@ pub struct DeleteGroupPermissionRequestBody {
 
 pub async fn list_groups(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
 ) -> HttpResponse {
     let result: HttpResponse = match chat_group_controller::list_groups(data, claims.0).await {
         Ok(res) => res,
@@ -88,7 +88,7 @@ pub async fn list_groups(
 
 pub async fn get_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
     json: web::Json<GetGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -104,7 +104,7 @@ pub async fn get_group(
 
 pub async fn new_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::CREATE_GROUP }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::CREATE_GROUP }>,
     json: web::Json<NewGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -120,7 +120,7 @@ pub async fn new_group(
 
 pub async fn update_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::UPDATE_GROUP }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::UPDATE_GROUP }>,
     json: web::Json<UpdateGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -136,7 +136,7 @@ pub async fn update_group(
 
 pub async fn delete_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::DELETE_GROUP }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::DELETE_GROUP }>,
     json: web::Json<DeleteGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -152,7 +152,7 @@ pub async fn delete_group(
 
 pub async fn list_messages(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
     json: web::Json<ListMessagesRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -168,7 +168,7 @@ pub async fn list_messages(
 
 pub async fn send_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::SEND_GROUP_MESSAGE }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::SEND_GROUP_MESSAGE }>,
     json: web::Json<SendMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -190,7 +190,7 @@ pub async fn send_message(
 
 pub async fn update_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::UPDATE_GROUP_MESSAGE }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::UPDATE_GROUP_MESSAGE }>,
     json: web::Json<UpdateMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -213,7 +213,7 @@ pub async fn update_message(
 
 pub async fn delete_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::DELETE_GROUP_MESSAGE }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::DELETE_GROUP_MESSAGE }>,
     json: web::Json<DeleteMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -231,7 +231,7 @@ pub async fn delete_message(
 
 pub async fn list_group_permissions(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
     json: web::Json<ListGroupPermissionsRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -247,7 +247,7 @@ pub async fn list_group_permissions(
 
 pub async fn add_group_permission(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::ADD_GROUP_MEMBER }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::ADD_GROUP_MEMBER }>,
     json: web::Json<AddGroupPermissionRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -270,7 +270,7 @@ pub async fn add_group_permission(
 
 pub async fn update_group_permission(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::UPDATE_GROUP_MEMBER }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::UPDATE_GROUP_MEMBER }>,
     json: web::Json<UpdateGroupPermissionRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -293,7 +293,7 @@ pub async fn update_group_permission(
 
 pub async fn delete_group_permission(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::REMOVE_GROUP_MEMBER }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::REMOVE_GROUP_MEMBER }>,
     json: web::Json<DeleteGroupPermissionRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();

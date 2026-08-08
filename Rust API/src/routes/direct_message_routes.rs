@@ -1,5 +1,5 @@
 use crate::controllers::direct_message_controller;
-use crate::extractors::{errors, global, RequireGlobal};
+use crate::extractors::{errors, user_type, RequireGlobal};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
@@ -28,7 +28,7 @@ pub struct DeleteMessageRequestBody {
 
 pub async fn list_conversations(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::READ_DIRECT_MESSAGES }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_DIRECT_MESSAGES }>,
 ) -> HttpResponse {
     let result: HttpResponse =
         match direct_message_controller::list_conversations(data, claims.0).await {
@@ -41,7 +41,7 @@ pub async fn list_conversations(
 
 pub async fn list_messages(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::READ_DIRECT_MESSAGES }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_DIRECT_MESSAGES }>,
     json: web::Json<ListMessagesRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -62,7 +62,7 @@ pub async fn list_messages(
 
 pub async fn send_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::SEND_DIRECT_MESSAGE }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::SEND_DIRECT_MESSAGE }>,
     json: web::Json<SendMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -84,7 +84,7 @@ pub async fn send_message(
 
 pub async fn update_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::UPDATE_DIRECT_MESSAGE }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::UPDATE_DIRECT_MESSAGE }>,
     json: web::Json<UpdateMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -106,7 +106,7 @@ pub async fn update_message(
 
 pub async fn delete_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::STANDARD_USER }, { errors::DELETE_DIRECT_MESSAGE }>,
+    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::DELETE_DIRECT_MESSAGE }>,
     json: web::Json<DeleteMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();

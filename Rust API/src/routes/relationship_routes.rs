@@ -1,5 +1,5 @@
 use crate::controllers::relationship_controller;
-use crate::extractors::{errors, global, RequireGlobal};
+use crate::extractors::{errors, user_type, RequireGlobal};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
