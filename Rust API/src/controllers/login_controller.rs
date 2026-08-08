@@ -241,25 +241,52 @@ pub async fn login_user(
                                 actix_web::error::ErrorInternalServerError(e.to_string())
                             })?;
 
-                            let themes =
-                                sqlx::query_as!(Theme, "SELECT id, theme FROM themes ORDER BY id")
-                                    .fetch_all(&pool)
-                                    .await
-                                    .map_err(|e| {
-                                        actix_web::error::ErrorInternalServerError(e.to_string())
-                                    })?;
+                            if (update_token.rows_affected() > 0) {
+                                let themes = sqlx::query_as!(
+                                    Theme,
+                                    "SELECT id, theme FROM themes ORDER BY id"
+                                )
+                                .fetch_all(&pool)
+                                .await
+                                .map_err(|e| {
+                                    actix_web::error::ErrorInternalServerError(e.to_string())
+                                })?;
 
-                            let response = LoginResponse {
-                                msg: String::from("Login successful"),
-                                access_token: Some(access_token),
-                                user: Some(user),
-                                themes: Some(themes),
-                                success: true,
-                            };
+                                match themes {
+                                    Some(_themes) => {
+                                        let response = LoginResponse {
+                                            msg: String::from("Login Successful"),
+                                            access_token: Some(access_token),
+                                            user: Some(user),
+                                            themes: Some(_themes),
+                                            success: true,
+                                        };
+                                    }
+                                    None => {
+                                        let response = LoginResponse {
+                                            msg: String::from("Login Failed"),
+                                            access_token: None,
+                                            user: None,
+                                            themes: None,
+                                            success: false,
+                                        };
+                                    }
+                                }
 
-                            Ok(HttpResponse::Ok()
-                                .cookie(build_refresh_cookie(refresh_token))
-                                .json(response))
+                                Ok(HttpResponse::Ok()
+                                    .cookie(build_refresh_cookie(refresh_token))
+                                    .json(response))
+                            } else {
+                                let response = LoginResponse {
+                                    msg: String::from("User Authentication Not Found"),
+                                    access_token: None,
+                                    user: None,
+                                    themes: None,
+                                    success: false,
+                                };
+
+                                Ok(HttpResponse::Unauthorized().json(response))
+                            }
                         }
                         Err(_) => {
                             let response = LoginResponse {
@@ -281,6 +308,7 @@ pub async fn login_user(
                         themes: None,
                         success: false,
                     };
+
                     Ok(HttpResponse::Unauthorized().json(response))
                 }
             }
@@ -390,13 +418,7 @@ pub async fn refresh_token(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected() > 0) {
-                let response = Response {
-                    msg: String::from("User Token Update Failed"),
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
+            if (result.rows_affected() > 0) {
                 let response = DataResponse {
                     msg: String::from("Token refreshed"),
                     data: new_access_token,
@@ -406,6 +428,13 @@ pub async fn refresh_token(
                 Ok(HttpResponse::Ok()
                     .cookie(build_refresh_cookie(new_refresh_token))
                     .json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("User Token Update Failed"),
+                    success: false,
+                };
+
+                Ok(HttpResponse::BadRequest().json(response))
             }
         }
     }
@@ -417,7 +446,7 @@ pub async fn logout_user(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    result = sqlx::query!(
+    let result = sqlx::query!(
         "UPDATE users SET
             refresh_token = NULL,
             refresh_token_expires_at = NULL,
@@ -431,14 +460,7 @@ pub async fn logout_user(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected() > 0) {
-        let response = Response {
-            msg: String::from("User Token Update Failed"),
-            success: false,
-        };
-
-        Ok(HttpResponse::BadRequest().json(response))
-    } else {
+    if (result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("Logged out successfully"),
             success: true,
@@ -447,6 +469,13 @@ pub async fn logout_user(
         Ok(HttpResponse::Ok()
             .cookie(clear_refresh_cookie())
             .json(response))
+    } else {
+        let response = Response {
+            msg: String::from("User Token Update Failed"),
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
     }
 }
 
@@ -495,19 +524,20 @@ pub async fn reset_user_password(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected() > 0) {
-                let response = Response {
-                    msg: String::from("Password reset failed"),
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
+            if (result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("Password reset successful"),
                     success: true,
                 };
 
                 Ok(HttpResponse::Ok().json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("Password reset failed"),
+                    success: false,
+                };
+
+                Ok(HttpResponse::BadRequest().json(response))
             }
         }
     }

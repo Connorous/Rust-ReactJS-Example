@@ -267,18 +267,18 @@ pub async fn new_user(
 
             if (!result.rows_affected() > 0) {
                 let response = Response {
-                    msg: String::from("Failed to Create User"),
-                    success: false,
-                };
-
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
-                let response = Response {
                     msg: String::from("User Created Successfully"),
                     success: true,
                 };
 
                 Ok(HttpResponse::Ok().json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("Failed to Create User"),
+                    success: false,
+                };
+
+                Ok(HttpResponse::BadRequest().json(response))
             }
         }
     }
@@ -333,7 +333,7 @@ pub async fn update_user(
             // Cannot set a user to a type with higher authority than yourself
             if claims.user_type_id > user_type_id {
                 let response = Response {
-                    msg: String::from("You Cannot Update a Sser to a Type Greater than Yourself"),
+                    msg: String::from("You Cannot Update a User to a Type Greater than Yourself"),
                     success: false,
                 };
                 return Ok(HttpResponse::Forbidden().json(response));
@@ -361,18 +361,20 @@ pub async fn update_user(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected() > 0) {
-                let response = Response {
-                    msg: String::from("User Not Updated"),
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
+            if (result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("User updated Successfully"),
                     success: true,
                 };
+
                 Ok(HttpResponse::Ok().json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("User Not Updated"),
+                    success: false,
+                };
+
+                Ok(HttpResponse::BadRequest().json(response))
             }
         }
     }
@@ -398,13 +400,7 @@ pub async fn logout_user(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected() > 0) {
-        let response = Response {
-            msg: String::from("Logout Failed"),
-            success: false,
-        };
-        Ok(HttpResponse::BadRequest().json(response))
-    } else {
+    if (result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("Logged out Successfully"),
             success: true,
@@ -413,6 +409,13 @@ pub async fn logout_user(
         Ok(HttpResponse::Ok()
             .cookie(clear_refresh_cookie())
             .json(response))
+    } else {
+        let response = Response {
+            msg: String::from("Logout Failed"),
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
     }
 }
 
@@ -467,20 +470,20 @@ pub async fn update_profile(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected() > 0) {
-        let response = Response {
-            msg: String::from("Profile Not Updated"),
-            success: false,
-        };
-
-        Ok(HttpResponse::BadRequest().json(response))
-    } else {
+    if (result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("Profile Updated Successfully"),
             success: true,
         };
 
         Ok(HttpResponse::Ok().json(response))
+    } else {
+        let response = Response {
+            msg: String::from("Profile Not Updated"),
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
     }
 }
 
@@ -500,20 +503,20 @@ pub async fn update_status(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected() > 0) {
-        let response = Response {
-            msg: String::from("Status Not Updated"),
-            success: false,
-        };
-
-        Ok(HttpResponse::BadRequest().json(response))
-    } else {
+    if (result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("Status Updated Successfully"),
             success: true,
         };
 
         Ok(HttpResponse::Ok().json(response))
+    } else {
+        let response = Response {
+            msg: String::from("Status Not Updated"),
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
     }
 }
 
@@ -611,18 +614,20 @@ pub async fn delete_user(
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected() > 0) {
-                let response = Response {
-                    msg: String::from("User Not Deleted"),
-                    success: false,
-                };
-                Ok(HttpResponse::BadRequest().json(response))
-            } else {
+            if (result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("User Deleted Successfully"),
                     success: true,
                 };
+
                 Ok(HttpResponse::Ok().json(response))
+            } else {
+                let response = Response {
+                    msg: String::from("User Not Deleted"),
+                    success: false,
+                };
+
+                Ok(HttpResponse::BadRequest().json(response))
             }
         }
     }
