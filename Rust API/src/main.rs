@@ -93,14 +93,15 @@ async fn main() -> std::io::Result<()> {
 
     let connections: UserConnections = Arc::new(RwLock::new(HashMap::new()));
 
+    // Spawn PG LISTEN/NOTIFY listener as background task
+    let listener_pool = pool.clone();
+    let listener_connections = connections.clone();
+
     let data = web::Data::new(state::AppState {
         db: pool,
         connections,
     });
 
-    // Spawn PG LISTEN/NOTIFY listener as background task
-    let listener_pool = pool.clone();
-    let listener_connections = connections.clone();
     tokio::spawn(async move {
         listeners::pg_listener(listener_pool, listener_connections).await;
     });
@@ -114,8 +115,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(configure_cors())
             .configure(routes::configure_login_routes)
             .configure(routes::configure_user_routes)
-            .configure(routes::configure_chat_group_routes)
+            .configure(routes::configure_relationship_routes)
             .configure(routes::configure_direct_message_routes)
+            .configure(routes::configure_chat_group_routes)
+            .configure(routes::configure_ws_routes)
     })
     .bind("0.0.0.0:8080")?
     .run()

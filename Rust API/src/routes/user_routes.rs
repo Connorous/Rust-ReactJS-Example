@@ -184,7 +184,7 @@ pub async fn logout_user(
     data: web::Data<AppState>,
     claims: RequireGlobal<{ global::VIEWER }, { errors::DEFAULT }>,
 ) -> HttpResponse {
-    let result: HttpResponse = match user_controller::logout_user(data, claims.0.id).await {
+    let result: HttpResponse = match user_controller::logout_user(data, claims.0.user_id).await {
         Ok(res) => res,
         Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
     };

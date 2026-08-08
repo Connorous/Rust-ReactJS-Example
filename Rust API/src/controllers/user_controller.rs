@@ -265,7 +265,7 @@ pub async fn new_user(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected > 0) {
+            if (!result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("Failed to Create User"),
                     success: false,
@@ -361,7 +361,7 @@ pub async fn update_user(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected > 0) {
+            if (!result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("User Not Updated"),
                     success: false,
@@ -398,7 +398,7 @@ pub async fn logout_user(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected > 0) {
+    if (!result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("Logout Failed"),
             success: false,
@@ -468,7 +468,7 @@ pub async fn update_profile(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected > 0) {
+    if (!result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("Profile Not Updated"),
             success: false,
@@ -501,7 +501,7 @@ pub async fn update_status(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected > 0) {
+    if (!result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("Status Not Updated"),
             success: false,

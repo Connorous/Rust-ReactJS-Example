@@ -126,7 +126,7 @@ pub async fn register_user(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected > 0) {
+            if (!result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("Used Registration failed"),
                     success: false,
@@ -390,7 +390,7 @@ pub async fn refresh_token(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected > 0) {
+            if (!result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("User Token Update Failed"),
                     success: false,
@@ -431,7 +431,7 @@ pub async fn logout_user(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (!result.rows_affected > 0) {
+    if (!result.rows_affected() > 0) {
         let response = Response {
             msg: String::from("User Token Update Failed"),
             success: false,
@@ -495,7 +495,7 @@ pub async fn reset_user_password(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (!result.rows_affected > 0) {
+            if (!result.rows_affected() > 0) {
                 let response = Response {
                     msg: String::from("Password reset failed"),
                     success: false,
