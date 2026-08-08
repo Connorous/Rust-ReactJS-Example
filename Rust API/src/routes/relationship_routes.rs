@@ -5,6 +5,11 @@ use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
+pub struct UserId {
+    pub user_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
 pub struct NewRelationshipRequestBody {
     pub receiver_id: i64,
 }
@@ -39,15 +44,23 @@ pub async fn list_relationships(
     result
 }
 
-pub async fn list_relationships(
+pub async fn list_user_relationships(
     data: web::Data<AppState>,
     claims: RequireGlobal<{ user_type::ADMIN }, { errors::LIST_RELATIONSHIPS_ADMIN }>,
+    json: web::Json<UserId>,
 ) -> HttpResponse {
-    let result: HttpResponse =
-        match relationship_controller::list_relationships(data, claims.0).await {
-            Ok(res) => res,
-            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-        };
+    let body = json.clone();
+
+    let result: HttpResponse = match relationship_controller::list_user_relationships(
+        data,
+        claims.0,
+        body.user_id,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
 
     result
 }
