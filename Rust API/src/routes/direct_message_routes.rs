@@ -26,19 +26,6 @@ pub struct DeleteMessageRequestBody {
     pub message_id: i64,
 }
 
-pub async fn list_conversations(
-    data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_DIRECT_MESSAGES }>,
-) -> HttpResponse {
-    let result: HttpResponse =
-        match direct_message_controller::list_conversations(data, claims.0).await {
-            Ok(res) => res,
-            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-        };
-
-    result
-}
-
 pub async fn list_messages(
     data: web::Data<AppState>,
     claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_DIRECT_MESSAGES }>,

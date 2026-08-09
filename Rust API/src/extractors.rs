@@ -59,8 +59,9 @@ pub mod errors {
     // Relationships
     pub const SEND_FRIEND_REQUEST: u8 = 30;
     pub const UPDATE_RELATIONSHIP: u8 = 31;
-    pub const DELETE_RELATIONSHIP: u8 = 32;
-    pub const LIST_RELATIONSHIPS: u8 = 33;
+    pub const BLOCK_RELATIONSHIP: u8 = 32;
+    pub const DELETE_RELATIONSHIP: u8 = 33;
+    pub const LIST_RELATIONSHIPS: u8 = 34;
     pub const LIST_RELATIONSHIPS_ADMIN: u8 = 34;
 
     // Message ownership
@@ -76,48 +77,61 @@ pub mod errors {
 pub fn permission_error_message(err_code: u8) -> &'static str {
     match err_code {
         // User management
-        errors::LIST_USERS => "You lack permissions to list users",
-        errors::CREATE_USER => "You lack permissions to create users",
-        errors::UPDATE_USER => "You lack permissions to update users",
-        errors::DELETE_USER => "You lack permissions to delete users",
-        errors::LIST_USER_TYPES => "You lack permissions to list user types",
-        errors::GET_USER => "You lack permissions to view this user",
-        errors::UPDATE_PROFILE => "You lack permissions to update your profile",
-        errors::UPDATE_STATUS => "You lack permissions to update your status",
-        errors::CHANGE_PASSWORD => "You lack permissions to change your password",
+        errors::LIST_USERS => "You Do Not Have Permissions to View List of Users",
+        errors::CREATE_USER => "You Do Not Have Permissions to Create Users",
+        errors::UPDATE_USER => "You Do Not Have Permissions to Update Users",
+        errors::DELETE_USER => "You Do Not Have Permissions to Delete Users",
+        errors::LIST_USER_TYPES => "You Do Not Have Permissions to Get User Types",
+        errors::GET_USER => "You Do Not Have Permissions to View this user",
+        errors::UPDATE_PROFILE => "You Do Not Have Permissions to Update Your Profile",
+        errors::UPDATE_STATUS => "You Do Not Have Permissions to Update Your Status",
+        errors::CHANGE_PASSWORD => "You Do Not Have Permissions to Change Your Password",
 
         // Direct messages
-        errors::SEND_DIRECT_MESSAGE => "You lack permissions to send direct messages",
-        errors::UPDATE_DIRECT_MESSAGE => "You lack permissions to update this message",
-        errors::DELETE_DIRECT_MESSAGE => "You lack permissions to delete this message",
-        errors::READ_DIRECT_MESSAGES => "You lack permissions to read direct messages",
+        errors::SEND_DIRECT_MESSAGE => "You Do Not Have Permissions to Send direct Messages",
+        errors::UPDATE_DIRECT_MESSAGE => "You Do Not Have Permissions to Update this Message",
+        errors::DELETE_DIRECT_MESSAGE => "You Do Not Have Permissions to Delete this Message",
+        errors::READ_DIRECT_MESSAGES => "You Do Not Have Permissions to Read Direct Messages",
 
         // Groups
-        errors::CREATE_GROUP => "You lack permissions to create groups",
-        errors::UPDATE_GROUP => "You lack permissions to update this group",
-        errors::DELETE_GROUP => "You lack permissions to delete this group",
-        errors::READ_GROUP => "You lack permissions to view this group",
-        errors::SEND_GROUP_MESSAGE => "You lack permissions to send messages in this group",
-        errors::UPDATE_GROUP_MESSAGE => "You lack permissions to update messages in this group",
-        errors::DELETE_GROUP_MESSAGE => "You lack permissions to delete messages in this group",
-        errors::ADD_GROUP_MEMBER => "You lack permissions to add members to this group",
-        errors::UPDATE_GROUP_MEMBER => "You lack permissions to update members in this group",
-        errors::REMOVE_GROUP_MEMBER => "You lack permissions to remove members from this group",
-
-        // Relationships
-        errors::SEND_FRIEND_REQUEST => "You lack permissions to send friend requests",
-        errors::UPDATE_RELATIONSHIP => "You lack permissions to update this relationship",
-        errors::DELETE_RELATIONSHIP => "You lack permissions to delete this relationship",
-        errors::LIST_RELATIONSHIPS => "You lack permissions to see a list of your relationships",
-        errors::LIST_RELATIONSHIPS_ADMIN => {
-            "You lack permissions to see a list of this user's relationships"
+        errors::CREATE_GROUP => "You Do Not Have Permissions to Create Chat Groups",
+        errors::UPDATE_GROUP => "You Do Not Have Permissions to Update this Chat Group",
+        errors::DELETE_GROUP => "You Do Not Have Permissions to Delete this Chat Group",
+        errors::READ_GROUP => "You Do Not Have Permissions to View this Chat Group",
+        errors::SEND_GROUP_MESSAGE => {
+            "You Do Not Have Permissions to Send Messages in this Chat Group"
+        }
+        errors::UPDATE_GROUP_MESSAGE => {
+            "You Do Not Have Permissions to Update Your Messages in this Chat Group"
+        }
+        errors::DELETE_GROUP_MESSAGE => {
+            "You Do Not Have Permissions to Delete Messages in this Chat Group"
+        }
+        errors::ADD_GROUP_MEMBER => {
+            "You Do Not Have Permissions to Add New Members to this Chat Group"
+        }
+        errors::UPDATE_GROUP_MEMBER => {
+            "You Do Not Have Permissions to Update Members in this Chat Group"
+        }
+        errors::REMOVE_GROUP_MEMBER => {
+            "You Do Not Have Permissions to Remove Members From this Chat Group"
         }
 
-        // Message ownership
-        errors::UPDATE_MESSAGE_NOT_OWNER => "You cannot edit a message you did not send",
-        errors::DELETE_MESSAGE_NOT_OWNER => "You cannot delete a message you did not send",
+        // Relationships
+        errors::SEND_FRIEND_REQUEST => "You Do Not Have Permissions to Send Friend Requests",
+        errors::UPDATE_RELATIONSHIP => {
+            "You Do Not Have Permissions to Accept or Decline Friend Requests"
+        }
+        errors::BLOCK_RELATIONSHIP => "You Do Not Have Permissions to Block Friend Requests",
+        errors::DELETE_RELATIONSHIP => "You Do Not Have Permissions to Delete this Relationship",
+        errors::LIST_RELATIONSHIPS => {
+            "You Do Not Have Permissions to see a List of Your Relationships with other Users"
+        }
+        errors::LIST_RELATIONSHIPS_ADMIN => {
+            "You Do Not Have Permissions to see a List of this User's Relationships with other Users"
+        }
 
-        _ => "Insufficient permissions",
+        _ => "Insufficient Permissions",
     }
 }
 
@@ -200,11 +214,13 @@ async fn extract_and_verify(req: &HttpRequest) -> Result<JwtClaims, actix_web::E
 
 // --- GLOBAL PERMISSION EXTRACTOR ---
 // Used for all non-group routes
-// RequireGlobal<{ global::ADMIN }, { errors::LIST_USERS }>
+// RequireGlobal<{ user_type::ADMIN }, { errors::LIST_USERS }>
 
-pub struct RequireGlobal<const LEVEL: i64, const ERR: u8>(pub JwtClaims);
+pub struct RequireUserType<const LEVEL: i64, const ERR: u8>(pub JwtClaims);
 
-impl<const LEVEL: i64, const ERR: u8> FromRequest for RequireGlobal<LEVEL, ERR> {
+impl<const USER_TYPE_LEVEL: i64, const ERR: u8> FromRequest
+    for RequireUserType<USER_TYPE_LEVEL, ERR>
+{
     type Error = actix_web::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self, Self::Error>>>>;
 
@@ -222,17 +238,17 @@ impl<const LEVEL: i64, const ERR: u8> FromRequest for RequireGlobal<LEVEL, ERR> 
 
             // Reject blocked users
             if claims.user_type_id == user_type::BLOCKED {
-                return Err(ErrorForbidden("Account is blocked"));
+                return Err(ErrorForbidden("Account is Blocked"));
             }
 
             // Reject suspended or closed accounts
             if claims.account_status_id != 1 {
-                return Err(ErrorForbidden("Account is not active"));
+                return Err(ErrorForbidden("Account is Not Active"));
             }
 
             // Check permission level
-            if claims.user_type_id <= LEVEL {
-                Ok(RequireGlobal(claims))
+            if claims.user_type_id <= USER_TYPE_LEVEL {
+                Ok(RequireUserType(claims))
             } else {
                 Err(ErrorForbidden(permission_error_message(ERR)))
             }
@@ -242,15 +258,19 @@ impl<const LEVEL: i64, const ERR: u8> FromRequest for RequireGlobal<LEVEL, ERR> 
 
 // --- GROUP PERMISSION EXTRACTOR ---
 // Used for chat group routes only
-// RequireGroup<{ global::STANDARD_USER }, { group::MEMBER }, { errors::SEND_GROUP_MESSAGE }>
+// RequireGroup<{ user_type::STANDARD_USER }, { group_permission::MEMBER }, { errors::SEND_GROUP_MESSAGE }>
 
-pub struct RequireGroup<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> {
+pub struct RequireGroup<
+    const USER_TYPE_LEVEL: i64,
+    const GROUP_PERMISSION_LEVEL: i64,
+    const ERR: u8,
+> {
     pub claims: JwtClaims,
     pub group_permission: i64,
 }
 
-impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
-    for RequireGroup<GLOBAL_LEVEL, GROUP_LEVEL, ERR>
+impl<const USER_TYPE_LEVEL: i64, const GROUP_PERMISSION_LEVEL: i64, const ERR: u8> FromRequest
+    for RequireGroup<USER_TYPE_LEVEL, GROUP_PERMISSION_LEVEL, ERR>
 {
     type Error = actix_web::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self, Self::Error>>>>;
@@ -274,11 +294,11 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
 
             // Reject suspended or closed accounts
             if claims.account_status_id != 1 {
-                return Err(ErrorForbidden("Account is not active"));
+                return Err(ErrorForbidden("Account is Not Active"));
             }
 
-            // Check global level requirement for this route
-            if claims.user_type_id > GLOBAL_LEVEL {
+            // Check user type level requirement for this route
+            if claims.user_type_id > USER_TYPE_LEVEL {
                 return Err(ErrorForbidden(permission_error_message(ERR)));
             }
 
@@ -290,7 +310,7 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
                 });
             }
 
-            // Get DB pool from app state
+            // Get DB pool from app state ? why use app state differently unlike other functions?
             let data = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
                 Some(d) => d,
                 None => {
@@ -337,7 +357,7 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
 
             // Reject blocked group members
             if group_permission == group_permission::BLOCKED {
-                return Err(ErrorForbidden("You are blocked in this group"));
+                return Err(ErrorForbidden("You are Blocked From this Group"));
             }
 
             // Check group permission level
@@ -351,28 +371,4 @@ impl<const GLOBAL_LEVEL: i64, const GROUP_LEVEL: i64, const ERR: u8> FromRequest
             }
         })
     }
-}
-
-// --- MESSAGE OWNERSHIP HELPERS ---
-
-pub fn check_can_update_message(sender_id: i64, user_id: i64) -> bool {
-    sender_id == user_id
-}
-
-pub fn check_can_delete_message(
-    sender_id: i64,
-    user_id: i64,
-    user_type_id: i64,
-    group_permission: Option<i64>,
-) -> bool {
-    let is_sender = sender_id == user_id;
-
-    let is_global_admin = user_type_id <= user_type::ADMIN;
-
-    let is_group_moderator = match group_permission {
-        Some(p) => p <= group_permission::MODERATOR,
-        None => false,
-    };
-
-    is_sender || is_global_admin || is_group_moderator
 }

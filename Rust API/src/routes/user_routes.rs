@@ -73,7 +73,7 @@ pub async fn list_users(
 
 pub async fn list_user_types(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::ADMIN }, { errors::LIST_USER_TYPES }>,
+    claims: RequireGlobal<{ user_type::VIEWER }, { errors::LIST_USER_TYPES }>,
 ) -> HttpResponse {
     let result: HttpResponse = match user_controller::list_user_types(data, claims.0).await {
         Ok(res) => res,

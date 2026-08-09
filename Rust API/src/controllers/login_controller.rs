@@ -66,8 +66,6 @@ struct LoginResponse {
     success: bool,
 }
 
-// --- HELPERS ---
-
 fn empty_string_check(fields: Vec<&str>) -> bool {
     fields.iter().any(|f| f.trim().is_empty())
 }
@@ -202,7 +200,7 @@ pub async fn login_user(
                 Some(auth_details) => {
                     if (auth_details.account_status_id != 1) {
                         let response: LoginResponse = LoginResponse {
-                            msg: String::from("Account is suspended or closed"),
+                            msg: String::from("Your Account is Suspended or Closed"),
                             access_token: None,
                             user: None,
                             themes: None,
@@ -290,9 +288,9 @@ pub async fn login_user(
                                 Ok(HttpResponse::Unauthorized().json(response))
                             }
                         }
-                        Err(_) => {
+                        Err(_password_match_error) => {
                             let response = LoginResponse {
-                                msg: String::from("Incorrect password"),
+                                msg: String::from("Incorrect Password"),
                                 access_token: None,
                                 user: None,
                                 themes: None,
@@ -304,7 +302,7 @@ pub async fn login_user(
                 }
                 None => {
                     let response = LoginResponse {
-                        msg: String::from("User Authentication Not Found"),
+                        msg: String::from("User Account Details Not Found"),
                         access_token: None,
                         user: None,
                         themes: None,
