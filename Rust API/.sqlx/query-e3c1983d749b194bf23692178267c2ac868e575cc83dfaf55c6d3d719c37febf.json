@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE user_relationships SET\n                            status_id = 2,\n                            blocked_by = NULL,\n                            updated_at = NOW()\n                         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e3c1983d749b194bf23692178267c2ac868e575cc83dfaf55c6d3d719c37febf"
+}

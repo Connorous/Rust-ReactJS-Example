@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, status_id, blocked_by, declined_by FROM user_relationships\n         WHERE id = $1 AND (requester_id = $2 OR receiver_id = $2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "user_relationships",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "user_relationships",
+            "name": "status_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "blocked_by",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "user_relationships",
+            "name": "blocked_by"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "declined_by",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "user_relationships",
+            "name": "declined_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "7b0c25eea07160f2c678da2a0489d584bec950e7085983d9fb15812ad9c0c67f"
+}

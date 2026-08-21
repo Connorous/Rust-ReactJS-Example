@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users SET\n            refresh_token = NULL,\n            refresh_token_expires_at = NULL,\n            refresh_token_updated_at = NOW(),\n            is_online = FALSE,\n            status_id = 4\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5c098563b8bf334a576049633e03e6aee4951ac329f5433afff8dd69a9ef0e67"
+}

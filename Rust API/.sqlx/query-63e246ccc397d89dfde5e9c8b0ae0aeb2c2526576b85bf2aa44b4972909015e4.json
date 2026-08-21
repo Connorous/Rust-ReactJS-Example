@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_group_permissions SET\n            permission_type_id = $1,\n            updated_by = $2,\n            updated_at = NOW()\n         WHERE group_id = $3 AND user_id = $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "63e246ccc397d89dfde5e9c8b0ae0aeb2c2526576b85bf2aa44b4972909015e4"
+}

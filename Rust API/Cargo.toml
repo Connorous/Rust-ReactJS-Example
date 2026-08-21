@@ -1,7 +1,7 @@
 # Cargo.toml
 
 [package]
-name = "my-backend"
+name = "Chateract-Backend"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,10 +12,12 @@ actix-web = "4"
 actix-cors = "0.7.1"
 # WebSocket support
 actix-ws = "0.4.0"
+actix-rt = "2.10"
 futures-util = "0.3"
 # Serialization and deserialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.23.1"
 # Unique identifiers
 uuid = { version = "1", features = ["v4"] }
 # Async runtime logging
@@ -23,11 +25,14 @@ env_logger = "0.11"
 log = "0.4"
 # Date and time handling
 chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
 # Environment variable loading
 dotenvy = "0.15"
 # Database
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "postgres", "chrono"] }
 # Password hashing
 argon2 = "0.5.3"
+aes-gcm = { version = "0.10", features = ["getrandom"] } 
+rand_core = { version = "0.10.1" }
 # JWT
 jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_group_permissions\n                         (group_id, user_id, permission_type_id, updated_by)\n                         VALUES ($1, $2, $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cbeacacd1a4c22fcec02866dc48827a84364ec916d9f4f86178ebc7279d3d59b"
+}

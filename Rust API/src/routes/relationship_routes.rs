@@ -1,5 +1,5 @@
 use crate::controllers::relationship_controller;
-use crate::extractors::{errors, user_type, RequireGlobal};
+use crate::extractors::{errors, user_type, RequireUserType};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
@@ -7,6 +7,21 @@ use serde::Deserialize;
 #[derive(Deserialize, Clone)]
 pub struct UserId {
     pub user_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct SearchRelationshipRequestBody {
+    pub username: String,
+    pub email: String,
+    pub search_name: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct SearchUserRelationshipRequestBody {
+    pub user_id: i64,
+    pub username: String,
+    pub email: String,
+    pub search_name: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -33,7 +48,7 @@ pub struct DeleteRelationshipRequestBody {
 
 pub async fn list_relationships(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
 ) -> HttpResponse {
     let result: HttpResponse =
         match relationship_controller::list_relationships(data, claims.0).await {
@@ -44,9 +59,58 @@ pub async fn list_relationships(
     result
 }
 
+pub async fn search_relationships(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
+    json: web::Json<SearchRelationshipRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match relationship_controller::search_relationships(
+        data,
+        claims.0,
+        body.username,
+        body.email,
+        body.search_name,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn list_users_in_relationship_with(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS_ADMIN }>,
+) -> HttpResponse {
+    let result: HttpResponse =
+        match relationship_controller::list_users_in_relationship_with(data, claims.0).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn list_users_not_in_relationship_with(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS_ADMIN }>,
+) -> HttpResponse {
+    let result: HttpResponse =
+        match relationship_controller::list_users_not_in_relationship_with(data, claims.0).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
 pub async fn list_user_relationships(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::ADMIN }, { errors::LIST_RELATIONSHIPS_ADMIN }>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_RELATIONSHIPS_ADMIN }>,
     json: web::Json<UserId>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -65,9 +129,89 @@ pub async fn list_user_relationships(
     result
 }
 
+pub async fn search_user_relationships(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_RELATIONSHIPS_ADMIN }>,
+    json: web::Json<SearchUserRelationshipRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match relationship_controller::search_user_relationships(
+        data,
+        claims.0,
+        body.user_id,
+        body.username,
+        body.email,
+        body.search_name,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn list_user_users_in_relationship_with(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_RELATIONSHIPS }>,
+    json: web::Json<UserId>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match relationship_controller::list_user_users_in_relationship_with(
+        data,
+        claims.0,
+        body.user_id,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn list_user_users_not_in_relationship_with(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_RELATIONSHIPS }>,
+    json: web::Json<UserId>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match relationship_controller::list_user_users_not_in_relationship_with(
+            data,
+            claims.0,
+            body.user_id,
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn list_relationship_status_types(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
+) -> HttpResponse {
+    let result: HttpResponse =
+        match relationship_controller::list_relationship_status_types(data, claims.0).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
 pub async fn new_relationship(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::SEND_FRIEND_REQUEST }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::SEND_FRIEND_REQUEST }>,
     json: web::Json<NewRelationshipRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -83,7 +227,7 @@ pub async fn new_relationship(
 
 pub async fn update_relationship(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::UPDATE_RELATIONSHIP }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::UPDATE_RELATIONSHIP }>,
     json: web::Json<UpdateRelationshipRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -105,7 +249,7 @@ pub async fn update_relationship(
 
 pub async fn block_relationship(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::UPDATE_RELATIONSHIP }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::UPDATE_RELATIONSHIP }>,
     json: web::Json<BlockRelationshipRequestBody>,
 ) -> HttpResponse {
     let body: BlockRelationshipRequestBody = json.clone();
@@ -127,7 +271,7 @@ pub async fn block_relationship(
 
 pub async fn delete_relationship(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::DELETE_RELATIONSHIP }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::DELETE_RELATIONSHIP }>,
     json: web::Json<DeleteRelationshipRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();

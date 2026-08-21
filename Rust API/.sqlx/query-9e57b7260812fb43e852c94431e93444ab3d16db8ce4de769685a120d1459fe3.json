@@ -1,0 +1,316 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,\n                status_id, is_online, theme_id, theme_dark_mode,\n                light_theme_primary_colour, light_theme_secondary_colour,\n                light_theme_accent_colour, light_theme_sent_colour,\n                light_theme_received_colour, light_theme_dark_text_colour,\n                light_theme_light_text_colour, dark_theme_primary_colour,\n                dark_theme_secondary_colour, dark_theme_accent_colour,\n                dark_theme_sent_colour, dark_theme_received_colour,\n                dark_theme_dark_text_colour, dark_theme_light_text_colour\n         FROM users WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "username",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "username"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "bio_info",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "bio_info"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "user_type_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "user_type_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "account_status_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "account_status_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "status_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "status_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "is_online",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "is_online"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "theme_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "theme_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "theme_dark_mode",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "theme_dark_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "light_theme_primary_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "light_theme_primary_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "light_theme_secondary_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "light_theme_secondary_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "light_theme_accent_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "light_theme_accent_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "light_theme_sent_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "light_theme_sent_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "light_theme_received_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "light_theme_received_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "light_theme_dark_text_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "light_theme_dark_text_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "light_theme_light_text_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "light_theme_light_text_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "dark_theme_primary_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "dark_theme_primary_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "dark_theme_secondary_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "dark_theme_secondary_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "dark_theme_accent_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "dark_theme_accent_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "dark_theme_sent_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "dark_theme_sent_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "dark_theme_received_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "dark_theme_received_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "dark_theme_dark_text_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "dark_theme_dark_text_colour"
+          }
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "dark_theme_light_text_colour",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "dark_theme_light_text_colour"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9e57b7260812fb43e852c94431e93444ab3d16db8ce4de769685a120d1459fe3"
+}

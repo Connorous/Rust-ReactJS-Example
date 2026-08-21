@@ -1,11 +1,83 @@
 use crate::auth::{verify_access_token, JwtClaims};
+use actix_web::HttpResponse;
 use actix_web::{
     dev::Payload,
     error::{ErrorForbidden, ErrorInternalServerError, ErrorUnauthorized},
     FromRequest, HttpRequest,
 };
+use serde::Serialize;
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
+
+// App Error Handling
+
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    msg: String,
+    success: bool,
+}
+
+#[derive(Debug)]
+pub struct AppError {
+    pub status: u16,
+    pub msg: String,
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl actix_web::ResponseError for AppError {
+    fn error_response(&self) -> HttpResponse {
+        let response = ErrorResponse {
+            msg: self.msg.clone(),
+            success: false,
+        };
+
+        match self.status {
+            400 => HttpResponse::BadRequest().json(response),
+            401 => HttpResponse::Unauthorized().json(response),
+            403 => HttpResponse::Forbidden().json(response),
+            500 => HttpResponse::InternalServerError().json(response),
+            _ => HttpResponse::InternalServerError().json(response),
+        }
+    }
+}
+
+fn bad_request(msg: &str) -> actix_web::Error {
+    AppError {
+        status: 400,
+        msg: msg.to_string(),
+    }
+    .into()
+}
+
+fn unauthorized(msg: &str) -> actix_web::Error {
+    AppError {
+        status: 401,
+        msg: msg.to_string(),
+    }
+    .into()
+}
+
+fn forbidden(msg: &str) -> actix_web::Error {
+    AppError {
+        status: 403,
+        msg: msg.to_string(),
+    }
+    .into()
+}
+
+fn internal_error(msg: &str) -> actix_web::Error {
+    AppError {
+        status: 500,
+        msg: msg.to_string(),
+    }
+    .into()
+}
 
 // --- GLOBAL PERMISSION CONSTANTS ---
 
@@ -18,10 +90,11 @@ pub mod user_type {
 }
 
 pub mod group_permission {
-    pub const MODERATOR: i64 = 1;
-    pub const MEMBER: i64 = 2;
-    pub const VIEWER: i64 = 3;
-    pub const BLOCKED: i64 = 4;
+    pub const OWNER: i64 = 1;
+    pub const MODERATOR: i64 = 2;
+    pub const MEMBER: i64 = 3;
+    pub const VIEWER: i64 = 4;
+    pub const BLOCKED: i64 = 5;
 }
 
 // --- ERROR CODE CONSTANTS ---
@@ -49,24 +122,26 @@ pub mod errors {
     pub const UPDATE_GROUP: u8 = 21;
     pub const DELETE_GROUP: u8 = 22;
     pub const READ_GROUP: u8 = 23;
-    pub const SEND_GROUP_MESSAGE: u8 = 24;
-    pub const UPDATE_GROUP_MESSAGE: u8 = 25;
-    pub const DELETE_GROUP_MESSAGE: u8 = 26;
-    pub const ADD_GROUP_MEMBER: u8 = 27;
-    pub const UPDATE_GROUP_MEMBER: u8 = 28;
-    pub const REMOVE_GROUP_MEMBER: u8 = 29;
+    pub const LIST_GROUPS: u8 = 24;
+    pub const LIST_GROUPS_ADMIN: u8 = 25;
+    pub const SEND_GROUP_MESSAGE: u8 = 26;
+    pub const UPDATE_GROUP_MESSAGE: u8 = 27;
+    pub const DELETE_GROUP_MESSAGE: u8 = 28;
+    pub const ADD_GROUP_MEMBER: u8 = 29;
+    pub const UPDATE_GROUP_MEMBER: u8 = 30;
+    pub const REMOVE_GROUP_MEMBER: u8 = 31;
 
     // Relationships
-    pub const SEND_FRIEND_REQUEST: u8 = 30;
-    pub const UPDATE_RELATIONSHIP: u8 = 31;
-    pub const BLOCK_RELATIONSHIP: u8 = 32;
-    pub const DELETE_RELATIONSHIP: u8 = 33;
-    pub const LIST_RELATIONSHIPS: u8 = 34;
-    pub const LIST_RELATIONSHIPS_ADMIN: u8 = 34;
+    pub const SEND_FRIEND_REQUEST: u8 = 40;
+    pub const UPDATE_RELATIONSHIP: u8 = 41;
+    pub const BLOCK_RELATIONSHIP: u8 = 42;
+    pub const DELETE_RELATIONSHIP: u8 = 43;
+    pub const LIST_RELATIONSHIPS: u8 = 44;
+    pub const LIST_RELATIONSHIPS_ADMIN: u8 = 44;
 
     // Message ownership
-    pub const UPDATE_MESSAGE_NOT_OWNER: u8 = 40;
-    pub const DELETE_MESSAGE_NOT_OWNER: u8 = 41;
+    pub const UPDATE_MESSAGE_NOT_OWNER: u8 = 50;
+    pub const DELETE_MESSAGE_NOT_OWNER: u8 = 51;
 
     // Fallback
     pub const DEFAULT: u8 = 255;
@@ -98,6 +173,8 @@ pub fn permission_error_message(err_code: u8) -> &'static str {
         errors::UPDATE_GROUP => "You Do Not Have Permissions to Update this Chat Group",
         errors::DELETE_GROUP => "You Do Not Have Permissions to Delete this Chat Group",
         errors::READ_GROUP => "You Do Not Have Permissions to View this Chat Group",
+        errors::LIST_GROUPS => "You Do Not Have Permissions to View Chat Groups",
+        errors::LIST_GROUPS_ADMIN => "You Do Not Have Permissions to View Other Users' Chat Groups",
         errors::SEND_GROUP_MESSAGE => {
             "You Do Not Have Permissions to Send Messages in this Chat Group"
         }
@@ -136,76 +213,69 @@ pub fn permission_error_message(err_code: u8) -> &'static str {
 }
 
 // --- HELPER ---
-// Extracts and verifies JWT from Authorization header
-// Returns fresh JwtClaims with DB values overlaid
 
 async fn extract_and_verify(req: &HttpRequest) -> Result<JwtClaims, actix_web::Error> {
-    // Get Authorization header
     let auth_header = match req.headers().get("Authorization") {
         Some(h) => h,
         None => {
-            return Err(ErrorUnauthorized("No Authorization header"));
+            return Err(unauthorized("No Authorization header"));
         }
     };
 
-    // Parse header value
     let auth_str = match auth_header.to_str() {
         Ok(s) => s,
         Err(_) => {
-            return Err(ErrorUnauthorized("Invalid Authorization header"));
+            return Err(unauthorized("Invalid Authorization header"));
         }
     };
 
-    // Check Bearer prefix
-    if !auth_str.starts_with("Bearer ") {
-        return Err(ErrorUnauthorized("Invalid token format, no Bearer"));
+    if (!auth_str.starts_with("Bearer ")) {
+        return Err(unauthorized("Invalid token format, no Bearer"));
     }
 
-    // Extract and verify token signature and expiry
     let token = &auth_str["Bearer ".len()..];
 
     let claims = match verify_access_token(token) {
         Ok(c) => c,
         Err(_) => {
-            return Err(ErrorUnauthorized("Invalid or expired token"));
+            return Err(unauthorized("Invalid or expired token"));
         }
     };
 
-    // Get DB pool from app state
     let data = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
         Some(d) => d,
         None => {
-            return Err(ErrorInternalServerError("Missing app state"));
+            return Err(internal_error("Missing app state"));
         }
     };
 
-    // Query fresh user data — catches permission changes since token was issued
+    let pool = data.db.to_owned();
+
     let user = match sqlx::query!(
         "SELECT user_type_id, account_status_id FROM users WHERE id = $1",
         claims.user_id
     )
-    .fetch_optional(&data.db)
+    .fetch_optional(&pool)
     .await
     {
         Ok(u) => u,
         Err(_) => {
-            return Err(ErrorInternalServerError("DB error"));
+            return Err(internal_error("DB error"));
         }
     };
 
     let user = match user {
-        Some(u) => u,
+        Some(existing_user) => existing_user,
         None => {
-            return Err(ErrorUnauthorized("User not found"));
+            return Err(unauthorized("User not found"));
         }
     };
 
-    // Rebuild claims with fresh DB values overlaid on top of JWT values
     let fresh_claims = JwtClaims {
         sub: claims.sub,
         user_id: claims.user_id,
-        user_type_id: user.user_type_id,
-        account_status_id: user.account_status_id,
+        user_type_id: claims.user_type_id,
+        account_status_id: claims.account_status_id,
         exp: claims.exp,
     };
 
@@ -237,20 +307,41 @@ impl<const USER_TYPE_LEVEL: i64, const ERR: u8> FromRequest
             };
 
             // Reject blocked users
-            if claims.user_type_id == user_type::BLOCKED {
-                return Err(ErrorForbidden("Account is Blocked"));
+            if (claims.user_type_id == user_type::BLOCKED) {
+                return Err(AppError {
+                    status: 403,
+                    msg: String::from("Account is Blocked"),
+                }
+                .into());
             }
 
             // Reject suspended or closed accounts
-            if claims.account_status_id != 1 {
-                return Err(ErrorForbidden("Account is Not Active"));
+            if (claims.account_status_id != 1) {
+                return Err(AppError {
+                    status: 403,
+                    msg: String::from("Account is Not Active"),
+                }
+                .into());
+            }
+
+            // Check user type level requirement for this route
+            if (claims.user_type_id <= USER_TYPE_LEVEL) {
+                return Err(AppError {
+                    status: 403,
+                    msg: String::from(permission_error_message(ERR)),
+                }
+                .into());
             }
 
             // Check permission level
             if claims.user_type_id <= USER_TYPE_LEVEL {
                 Ok(RequireUserType(claims))
             } else {
-                Err(ErrorForbidden(permission_error_message(ERR)))
+                return Err(AppError {
+                    status: 403,
+                    msg: String::from(permission_error_message(ERR)),
+                }
+                .into());
             }
         })
     }
@@ -264,10 +355,7 @@ pub struct RequireGroup<
     const USER_TYPE_LEVEL: i64,
     const GROUP_PERMISSION_LEVEL: i64,
     const ERR: u8,
-> {
-    pub claims: JwtClaims,
-    pub group_permission: i64,
-}
+>(pub JwtClaims);
 
 impl<const USER_TYPE_LEVEL: i64, const GROUP_PERMISSION_LEVEL: i64, const ERR: u8> FromRequest
     for RequireGroup<USER_TYPE_LEVEL, GROUP_PERMISSION_LEVEL, ERR>
@@ -288,86 +376,163 @@ impl<const USER_TYPE_LEVEL: i64, const GROUP_PERMISSION_LEVEL: i64, const ERR: u
             };
 
             // Reject blocked users
-            if claims.user_type_id == user_type::BLOCKED {
-                return Err(ErrorForbidden("Account is blocked"));
+            if (claims.user_type_id == user_type::BLOCKED) {
+                return Err(AppError {
+                    status: 403,
+                    msg: String::from("Account is Blocked"),
+                }
+                .into());
             }
 
             // Reject suspended or closed accounts
-            if claims.account_status_id != 1 {
-                return Err(ErrorForbidden("Account is Not Active"));
+            if (claims.account_status_id != 1) {
+                return Err(AppError {
+                    status: 403,
+                    msg: String::from("Account is Not Active"),
+                }
+                .into());
             }
 
             // Check user type level requirement for this route
-            if claims.user_type_id > USER_TYPE_LEVEL {
-                return Err(ErrorForbidden(permission_error_message(ERR)));
+            if (claims.user_type_id <= USER_TYPE_LEVEL) {
+                return Err(AppError {
+                    status: 403,
+                    msg: String::from(permission_error_message(ERR)),
+                }
+                .into());
             }
 
             // Admins and super admins bypass group check entirely
             if claims.user_type_id <= user_type::ADMIN {
-                return Ok(RequireGroup {
-                    claims,
-                    group_permission: group_permission::MODERATOR,
-                });
+                return Ok(RequireGroup(claims));
             }
 
             // Get DB pool from app state ? why use app state differently unlike other functions?
             let data = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
-                Some(d) => d,
+                Some(appstate) => appstate,
                 None => {
-                    return Err(ErrorInternalServerError("Missing app state"));
+                    return Err(AppError {
+                        status: 500,
+                        msg: String::from("Missing App State"),
+                    }
+                    .into());
                 }
             };
+
+            let pool = data.db.to_owned();
 
             // Get group_id from request body extension
             // Set by the route handler before extractor runs
-            let group_id = match req.match_info().get("group_id") {
-                Some(id) => match id.parse::<i64>() {
-                    Ok(id) => id,
+            let group_id = match req.headers().get("Group-Id") {
+                Some(val) => match val.to_str() {
+                    Ok(id) => match id.parse::<i64>() {
+                        Ok(id) => Some(id),
+                        Err(_) => {
+                            return Err(AppError {
+                                status: 401,
+                                msg: String::from("Invalid group_id in header"),
+                            }
+                            .into());
+                        }
+                    },
                     Err(_) => {
-                        return Err(ErrorUnauthorized("Invalid group_id in path"));
+                        return Err(AppError {
+                            status: 401,
+                            msg: String::from("Missing group_id in header"),
+                        }
+                        .into());
                     }
                 },
                 None => {
-                    return Err(ErrorUnauthorized("Missing group_id in path"));
+                    return Err(AppError {
+                        status: 401,
+                        msg: String::from("Missing group_id in header"),
+                    }
+                    .into());
                 }
             };
 
-            // Query fresh group permission from DB
-            let group_perm = match sqlx::query_scalar!(
-                "SELECT permission_type_id FROM chat_group_permissions
-                 WHERE group_id = $1 AND user_id = $2",
+            // Query to see if group exists
+            let group = match sqlx::query_scalar!(
+                "SELECT id FROM chat_groups
+                 WHERE id = $1",
                 group_id,
-                claims.user_id
             )
             .fetch_optional(&data.db)
             .await
             {
-                Ok(p) => p,
+                Ok(existing_group) => existing_group,
                 Err(_) => {
-                    return Err(ErrorInternalServerError("DB error"));
+                    return Err(AppError {
+                        status: 500,
+                        msg: String::from("DB Error"),
+                    }
+                    .into());
                 }
             };
 
-            let group_permission = match group_perm {
-                Some(p) => p,
+            match group {
                 None => {
-                    return Err(ErrorForbidden("Not a member of this group"));
+                    return Err(AppError {
+                        status: 400,
+                        msg: String::from("Group Could Not be Found"),
+                    }
+                    .into());
                 }
-            };
+                Some(existing_group) => {
+                    // Query fresh group permission from DB
+                    let group_perm = match sqlx::query_scalar!(
+                        "SELECT permission_type_id FROM chat_group_permissions
+                 WHERE group_id = $1 AND user_id = $2",
+                        group_id,
+                        claims.user_id
+                    )
+                    .fetch_optional(&data.db)
+                    .await
+                    {
+                        Ok(permissions) => permissions,
+                        Err(_) => {
+                            return Err(AppError {
+                                status: 500,
+                                msg: String::from("DB Error"),
+                            }
+                            .into());
+                        }
+                    };
 
-            // Reject blocked group members
-            if group_permission == group_permission::BLOCKED {
-                return Err(ErrorForbidden("You are Blocked From this Group"));
-            }
+                    let group_permission = match group_perm {
+                        Some(permission) => permission,
+                        None => {
+                            return Err(AppError {
+                        status: 403,
+                        msg: String::from(
+                            "Group Permissions Could Not be Found for Your User for this Group",
+                        ),
+                    }
+                    .into());
+                        }
+                    };
 
-            // Check group permission level
-            if group_permission <= GROUP_LEVEL {
-                Ok(RequireGroup {
-                    claims,
-                    group_permission,
-                })
-            } else {
-                Err(ErrorForbidden(permission_error_message(ERR)))
+                    // Reject blocked group members
+                    if group_permission == group_permission::BLOCKED {
+                        return Err(AppError {
+                            status: 403,
+                            msg: String::from("You are Blocked From this Group"),
+                        }
+                        .into());
+                    }
+
+                    // Check group permission level
+                    if group_permission <= GROUP_PERMISSION_LEVEL {
+                        Ok(RequireGroup(claims))
+                    } else {
+                        return Err(AppError {
+                            status: 403,
+                            msg: String::from(permission_error_message(ERR)),
+                        }
+                        .into());
+                    }
+                }
             }
         })
     }

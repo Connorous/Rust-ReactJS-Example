@@ -72,6 +72,12 @@ struct UserType {
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct UserStatus {
+    id: i64,
+    status: String,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct Theme {
     id: i64,
     theme: String,
@@ -94,6 +100,60 @@ pub async fn list_users(
     let users = sqlx::query_as!(
         UserManageRow,
         "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users ORDER BY id"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match users.is_empty() {
+        true => {
+            let response = Response {
+                msg: String::from("No Users Found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        false => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: users,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn search_users(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    search_name: String,
+) -> Result<HttpResponse, actix_web::Error> {
+    if (search_name.is_empty()) {
+        let response = Response {
+            msg: String::from("Must Provide a Username or Email to Search for a User"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    } else if (search_name.len() < 3) {
+        let response = Response {
+            msg: String::from("Provided Search for Username or Email must be 3 or More Characters"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+    let search_like = format!("%{}%", search_name);
+
+    let pool = data.db.to_owned();
+
+    let users = sqlx::query_as!(
+        UserManageRow,
+        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users WHERE username LIKE $1 or email LIKE $1 or name LIKE $1 ORDER BY id", search_like
     )
     .fetch_all(&pool)
     .await
@@ -144,6 +204,76 @@ pub async fn list_user_types(
             let response = DataResponse {
                 msg: String::from("Success"),
                 data: user_types,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn list_user_status_types(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let user_status_types = sqlx::query_as!(
+        UserStatus,
+        "SELECT id, status FROM user_statuses ORDER BY id"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match user_status_types.is_empty() {
+        true => {
+            let response = Response {
+                msg: String::from("No User Types found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        false => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: user_status_types,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn list_account_status_types(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let account_status_types = sqlx::query_as!(
+        UserStatus,
+        "SELECT id, status FROM account_statuses ORDER BY id"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match account_status_types.is_empty() {
+        true => {
+            let response = Response {
+                msg: String::from("No User Types found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        false => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: account_status_types,
                 success: true,
             };
 
@@ -258,7 +388,7 @@ pub async fn new_user(
                 name,
                 hashed_password,
                 user_type_id,
-                1i64,
+                1,
                 claims.user_id,
                 claims.user_id
             )
@@ -569,7 +699,7 @@ pub async fn delete_user(
                 return Ok(HttpResponse::Forbidden().json(response));
             }
 
-            let owned_groups = sqlx::query!("SELECT id FROM chat_groups WHERE owner_id = $1", id)
+            let owned_groups = sqlx::query!("SELECT id FROM chat_groups WHERE id IN (SELECT group_id FROM chat_group_permissions WHERE permission_type_id = 1 AND user_id = $1)", id)
                 .fetch_all(&pool)
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;

@@ -1,5 +1,6 @@
-use crate::extractors::{errors, global, RequireGlobal};
+use crate::extractors::{errors, user_type, RequireUserType};
 use crate::state::{AppState, UserConnections};
+use actix_rt::spawn;
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_ws::Message;
 use futures_util::StreamExt;
@@ -9,7 +10,7 @@ pub async fn ws_handler(
     req: HttpRequest,
     body: web::Payload,
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ global::VIEWER }, { errors::DEFAULT }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::DEFAULT }>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let (response, mut session, mut stream) = actix_ws::handle(&req, body)?;
 
@@ -38,7 +39,7 @@ pub async fn ws_handler(
 
     // Task: receive from this client, handle ping/close
     let connections_clone = data.connections.clone();
-    tokio::spawn(async move {
+    actix_rt::spawn(async move {
         while let Some(Ok(msg)) = stream.next().await {
             match msg {
                 Message::Ping(bytes) => {
@@ -50,7 +51,6 @@ pub async fn ws_handler(
                 _ => {}
             }
         }
-        // Remove user from connections on disconnect
         connections_clone.write().await.remove(&user_id);
         let _ = session.close(None).await;
     });

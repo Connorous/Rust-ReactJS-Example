@@ -1,8 +1,24 @@
 use crate::controllers::chat_group_controller;
-use crate::extractors::{errors, group_permission, user_type, RequireGlobal, RequireGroup};
+use crate::extractors::{errors, group_permission, user_type, RequireGroup, RequireUserType};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
+
+#[derive(Deserialize, Clone)]
+pub struct SearchGroupsRequestBody {
+    pub search_name: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ListUserGroupsRequestBody {
+    pub user_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct SearchUserGroupsRequestBody {
+    pub user_id: i64,
+    pub search_name: String,
+}
 
 #[derive(Deserialize, Clone)]
 pub struct GetGroupRequestBody {
@@ -28,6 +44,12 @@ pub struct DeleteGroupRequestBody {
 #[derive(Deserialize, Clone)]
 pub struct ListMessagesRequestBody {
     pub group_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct SearchMessagesRequestBody {
+    pub group_id: i64,
+    pub message_content: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -76,7 +98,7 @@ pub struct DeleteGroupPermissionRequestBody {
 
 pub async fn list_groups(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::READ_GROUP }>,
 ) -> HttpResponse {
     let result: HttpResponse = match chat_group_controller::list_groups(data, claims.0).await {
         Ok(res) => res,
@@ -86,9 +108,132 @@ pub async fn list_groups(
     result
 }
 
+pub async fn search_groups(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    json: web::Json<SearchGroupsRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::search_groups(data, claims.0, body.search_name).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn list_user_groups(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::READ_GROUP }>,
+    json: web::Json<ListUserGroupsRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::list_user_groups(data, claims.0, body.user_id).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn search_user_groups(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::READ_GROUP }>,
+    json: web::Json<SearchUserGroupsRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match chat_group_controller::search_user_groups(
+        data,
+        claims.0,
+        body.user_id,
+        body.search_name,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn list_group_members(
+    data: web::Data<AppState>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::READ_GROUP },
+    >,
+    json: web::Json<GetGroupRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::list_group_members(data, claims.0, body.group_id).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn list_non_group_members(
+    data: web::Data<AppState>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::READ_GROUP },
+    >,
+    json: web::Json<GetGroupRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::list_non_group_members(data, claims.0, body.group_id).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn list_users_who_sent_group_messages(
+    data: web::Data<AppState>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::READ_GROUP },
+    >,
+    json: web::Json<GetGroupRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match chat_group_controller::list_users_who_sent_group_messages(
+        data,
+        claims.0,
+        body.group_id,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
 pub async fn get_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::READ_GROUP },
+    >,
     json: web::Json<GetGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -104,7 +249,7 @@ pub async fn get_group(
 
 pub async fn new_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::CREATE_GROUP }>,
+    claims: RequireUserType<{ user_type::STANDARD_USER }, { errors::CREATE_GROUP }>,
     json: web::Json<NewGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -120,7 +265,11 @@ pub async fn new_group(
 
 pub async fn update_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::UPDATE_GROUP }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MODERATOR },
+        { errors::UPDATE_GROUP },
+    >,
     json: web::Json<UpdateGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -136,7 +285,11 @@ pub async fn update_group(
 
 pub async fn delete_group(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::DELETE_GROUP }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::OWNER },
+        { errors::DELETE_GROUP },
+    >,
     json: web::Json<DeleteGroupRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -152,7 +305,11 @@ pub async fn delete_group(
 
 pub async fn list_messages(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::READ_GROUP },
+    >,
     json: web::Json<ListMessagesRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -166,9 +323,39 @@ pub async fn list_messages(
     result
 }
 
+pub async fn search_messages(
+    data: web::Data<AppState>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::READ_GROUP },
+    >,
+    json: web::Json<SearchMessagesRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match chat_group_controller::search_messages(
+        data,
+        claims.0,
+        body.group_id,
+        body.message_content,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
 pub async fn send_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::SEND_GROUP_MESSAGE }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MEMBER },
+        { errors::SEND_GROUP_MESSAGE },
+    >,
     json: web::Json<SendMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -190,7 +377,11 @@ pub async fn send_message(
 
 pub async fn update_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::UPDATE_GROUP_MESSAGE }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MEMBER },
+        { errors::UPDATE_GROUP_MESSAGE },
+    >,
     json: web::Json<UpdateMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -213,7 +404,11 @@ pub async fn update_message(
 
 pub async fn delete_message(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::DELETE_GROUP_MESSAGE }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MEMBER },
+        { errors::DELETE_GROUP_MESSAGE },
+    >,
     json: web::Json<DeleteMessageRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -231,7 +426,11 @@ pub async fn delete_message(
 
 pub async fn list_group_permissions(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MODERATOR },
+        { errors::READ_GROUP },
+    >,
     json: web::Json<ListGroupPermissionsRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -245,9 +444,35 @@ pub async fn list_group_permissions(
     result
 }
 
+pub async fn list_group_permission_types(
+    data: web::Data<AppState>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MODERATOR },
+        { errors::READ_GROUP },
+    >,
+    json: web::Json<ListGroupPermissionsRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::list_group_permission_types(data, claims.0, body.group_id)
+            .await
+        {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
 pub async fn add_group_permission(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::ADD_GROUP_MEMBER }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MODERATOR },
+        { errors::ADD_GROUP_MEMBER },
+    >,
     json: web::Json<AddGroupPermissionRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -270,7 +495,11 @@ pub async fn add_group_permission(
 
 pub async fn update_group_permission(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::UPDATE_GROUP_MEMBER }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MODERATOR },
+        { errors::UPDATE_GROUP_MEMBER },
+    >,
     json: web::Json<UpdateGroupPermissionRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -293,7 +522,11 @@ pub async fn update_group_permission(
 
 pub async fn delete_group_permission(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::STANDARD_USER }, { errors::REMOVE_GROUP_MEMBER }>,
+    claims: RequireGroup<
+        { user_type::STANDARD_USER },
+        { group_permission::MODERATOR },
+        { errors::REMOVE_GROUP_MEMBER },
+    >,
     json: web::Json<DeleteGroupPermissionRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();

@@ -13,9 +13,22 @@ struct RelationshipRow {
     declined_by: Option<i64>,
 }
 
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct UserRow {
+    id: i64,
+    username: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct Response {
     msg: String,
+    success: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ResponseEmptyList {
+    msg: String,
+    empty: bool,
     success: bool,
 }
 
@@ -45,8 +58,9 @@ pub async fn list_relationships(
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     if (relationships.is_empty()) {
-        let response = Response {
+        let response = ResponseEmptyList {
             msg: String::from("No Relationships Found"),
+            empty: true,
             success: false,
         };
 
@@ -59,6 +73,138 @@ pub async fn list_relationships(
         };
 
         Ok(HttpResponse::Ok().json(response))
+    }
+}
+
+pub async fn search_relationships(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    username: String,
+    email: String,
+    search_name: String,
+) -> Result<HttpResponse, actix_web::Error> {
+    if (search_name.is_empty()) {
+        let response = Response {
+            msg: String::from("Must Provide a Username or Email to Search for a Relationships"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    } else if (search_name.len() < 3) {
+        let response = Response {
+            msg: String::from("Provided Search for Username or Email must be 3 or More Characters"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+
+    let search_like = format!("%{}%", search_name);
+
+    let pool = data.db.to_owned();
+
+    let relationships = sqlx::query_as!(
+        RelationshipRow,
+        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
+         FROM user_relationships
+         WHERE (requester_id = $1 OR receiver_id = $1) AND (requester_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)) OR receiver_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)))))
+         ORDER BY id",
+        claims.user_id,
+        search_like,
+        username,
+        email
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    if (relationships.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Relationships Found"),
+            empty: true,
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: relationships,
+            success: true,
+        };
+
+        Ok(HttpResponse::Ok().json(response))
+    }
+}
+
+pub async fn list_users_in_relationship_with(data: web::Data<AppState>,
+    claims: JwtClaims) -> Result<HttpResponse, actix_web::Error>{
+    let pool = data.db.to_owned();
+
+    let users = sqlx::query_as!(
+      UserRow,
+        "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id = $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id = $1)) AND id != $1",
+        claims.user_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match users {
+        None => {
+            let response = ResponseEmptyList {
+                msg: String::from("No Users in Relationships With Found"),
+                empty: true,
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(users) => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: users,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn list_users_not_in_relationship_with(data: web::Data<AppState>,
+    claims: JwtClaims) -> Result<HttpResponse, actix_web::Error>{
+    let pool = data.db.to_owned();
+
+    let users = sqlx::query_as!(
+      UserRow,
+        "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id != $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id != $1)) AND id != $1",
+        claims.user_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match users {
+        None => {
+            let response = ResponseEmptyList {
+                msg: String::from("No Users in Not a Relationship With Found"),
+                empty: true,
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(users) => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: users,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
     }
 }
 
@@ -82,6 +228,180 @@ pub async fn list_user_relationships(
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     if (relationships.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Relationships Found"),
+            empty: true,
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: relationships,
+            success: true,
+        };
+
+        Ok(HttpResponse::Ok().json(response))
+    }
+}
+
+pub async fn search_user_relationships(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    user_id: i64,
+    username: String,
+    email: String,
+    search_name: String,
+) -> Result<HttpResponse, actix_web::Error> {
+    if (search_name.is_empty()) {
+        let response = Response {
+            msg: String::from("Must Provide a Username or Email to Search for a Relationships"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    } else if (search_name.len() < 3) {
+        let response = Response {
+            msg: String::from("Provided Search for Username or Email must be 3 or More Characters"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+
+    let search_like = format!("%{}%", search_name);
+
+
+
+    let pool = data.db.to_owned();
+
+    let relationships = sqlx::query_as!(
+        RelationshipRow,
+        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
+         FROM user_relationships
+         WHERE (requester_id = $1 OR receiver_id = $1) AND (requester_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)) OR receiver_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)))))
+         ORDER BY id",
+        user_id, 
+        search_like, 
+        username, 
+        email
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    if (relationships.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Relationships Found"),
+            empty: true,
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: relationships,
+            success: true,
+        };
+
+        Ok(HttpResponse::Ok().json(response))
+    }
+}
+
+
+pub async fn list_user_users_in_relationship_with(data: web::Data<AppState>,
+    claims: JwtClaims, user_id: i64) -> Result<HttpResponse, actix_web::Error>{
+    let pool = data.db.to_owned();
+
+    let users = sqlx::query_as!(
+      UserRow,
+        "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id = $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id = $1)) AND id != $1",
+        user_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match users {
+        None => {
+            let response = ResponseEmptyList {
+                msg: String::from("No Users in Relationships With Found"),
+                empty: true,
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(users) => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: users,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+pub async fn list_user_users_not_in_relationship_with(data: web::Data<AppState>,
+    claims: JwtClaims, user_id: i64) -> Result<HttpResponse, actix_web::Error>{
+    let pool = data.db.to_owned();
+
+    let users = sqlx::query_as!(
+      UserRow,
+        "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id != $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id != $1)) AND id != $1",
+        user_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match users {
+        None => {
+            let response = ResponseEmptyList {
+                msg: String::from("No Users in Not a Relationship With Found"),
+                empty: true,
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(users) => {
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: users,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+    }
+}
+
+
+pub async fn list_relationship_status_types(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let relationships_status = sqlx::query_as!(
+        RelationshipRow,
+        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
+         FROM user_relationships
+         WHERE requester_id = $1 OR receiver_id = $1
+         ORDER BY id",
+        claims.user_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    if (relationships_status.is_empty()) {
         let response = Response {
             msg: String::from("No Relationships Found"),
             success: false,
@@ -91,7 +411,7 @@ pub async fn list_user_relationships(
     } else {
         let response = DataResponse {
             msg: String::from("Success"),
-            data: relationships,
+            data: relationships_status,
             success: true,
         };
 

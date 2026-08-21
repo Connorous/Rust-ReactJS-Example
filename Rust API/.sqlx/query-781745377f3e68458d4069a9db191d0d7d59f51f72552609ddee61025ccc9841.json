@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT permission_type_id FROM chat_group_permissions\n                 WHERE group_id = $1 AND user_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "permission_type_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "chat_group_permissions",
+            "name": "permission_type_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "781745377f3e68458d4069a9db191d0d7d59f51f72552609ddee61025ccc9841"
+}

@@ -45,11 +45,11 @@ CREATE TABLE users (
     name TEXT NOT NULL,
     password TEXT NOT NULL,
     bio_info TEXT,
-    user_type_id INT NOT NULL REFERENCES user_types(id) DEFAULT 4,
-    account_status_id INT NOT NULL REFERENCES account_statuses(id) DEFAULT 1,
-    status_id INT REFERENCES user_statuses(id) DEFAULT 4,
+    user_type_id BIGSERIAL NOT NULL REFERENCES user_types(id) DEFAULT 4,
+    account_status_id BIGSERIAL NOT NULL REFERENCES account_statuses(id) DEFAULT 1,
+    status_id BIGSERIAL REFERENCES user_statuses(id) DEFAULT 1,
     is_online BOOLEAN NOT NULL DEFAULT FALSE,
-    theme_id INT REFERENCES themes(id) DEFAULT 1,
+    theme_id BIGSERIAL REFERENCES themes(id) DEFAULT 1,
     theme_dark_mode BOOLEAN NOT NULL DEFAULT FALSE,
 
 
@@ -88,7 +88,7 @@ CREATE TABLE user_relationships (
     id BIGSERIAL PRIMARY KEY,
     requester_id BIGINT NOT NULL REFERENCES users(id),
     receiver_id BIGINT NOT NULL REFERENCES users(id),
-    status_id INT NOT NULL REFERENCES relationship_statuses(id) DEFAULT 1,
+    status_id BIGINT NOT NULL REFERENCES relationship_statuses(id) DEFAULT 1,
     blocked_by BIGINT REFERENCES users(id),
     declined_by BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -99,7 +99,6 @@ CREATE TABLE user_relationships (
 CREATE TABLE chat_groups (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    owner_id BIGINT NOT NULL REFERENCES users(id),
     updated_by BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -109,7 +108,7 @@ CREATE TABLE chat_group_permissions (
     id BIGSERIAL PRIMARY KEY,
     group_id BIGINT NOT NULL REFERENCES chat_groups(id),
     user_id BIGINT NOT NULL REFERENCES users(id),
-    permission_type_id INT NOT NULL REFERENCES chat_group_permission_types(id),
+    permission_type_id BIGINT NOT NULL REFERENCES chat_group_permission_types(id),
     updated_by BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -137,7 +136,7 @@ INSERT INTO account_statuses (status) VALUES ('Active'), ('Suspended'), ('Closed
 INSERT INTO user_statuses (status) VALUES ('Online'), ('Idle'), ('Do Not Disturb'), ('Offline');
 INSERT INTO themes (theme) VALUES ('Default'), ('Rounded'), ('Sharp'), ('Gothic'), ('Times Roman');
 INSERT INTO relationship_statuses (status) VALUES ('Pending'), ('Accepted'), ('Blocked'), ('Declined');
-INSERT INTO chat_group_permission_types (permission_type) VALUES ('Moderator'), ('Member'), ('Viewer'), ('Blocked');
+INSERT INTO chat_group_permission_types (permission_type) VALUES ('Owner'), ('Moderator'), ('Member'), ('Viewer'), ('Blocked');
 
 
 -- TRIGGER FUNCTIONS

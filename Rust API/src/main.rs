@@ -4,9 +4,10 @@ use log::info;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::RwLock;
 mod auth;
 mod controllers;
+mod encryption;
 mod extractors;
 mod listeners;
 mod routes;
@@ -61,7 +62,7 @@ fn configure_cors() -> Cors {
     Cors::default()
         .allowed_origin(&frontend_url)
         .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-        .allowed_headers(vec!["Content-Type", "Authorization"])
+        .allowed_headers(vec!["Content-Type", "Authorization", "Group-Id"])
         .supports_credentials() // required for httpOnly cookies
         .max_age(3600)
 }
@@ -73,16 +74,18 @@ async fn main() -> std::io::Result<()> {
     // Create shared application state
     dotenv().ok();
 
-    let pg_user = env::var("PgUser").expect("PgUser must be set");
-    let pg_password = env::var("PgPassword").expect("PgPassword must be set");
-    let pg_ip = env::var("PgIp").expect("PgIp must be set");
-    let pg_port = env::var("PgPort").expect("PgPort must be set");
-    let pg_database = env::var("PgDatabase").expect("PgDatabase must be set");
+    let pg_user = env::var("PGUSER").expect("PGUSER must be set");
+    let pg_password = env::var("PGPASSWORD").expect("PGPASSWORD must be set");
+    let pg_ip = env::var("PGIP").expect("PGIP must be set");
+    let pg_port = env::var("PGPORT").expect("PGPORT must be set");
+    let pg_database = env::var("PGDATABBASE").expect("PGDATABBASE must be set");
 
     let database_url = format!(
         "postgresql://{}:{}@{}:{}/{}",
         pg_user, pg_password, pg_ip, pg_port, pg_database
     );
+
+    println!("🚀 CONNECTING TO DATABASE: {}", database_url);
 
     let pool = PgPoolOptions::new()
         .max_connections(5)

@@ -1,8 +1,13 @@
 use crate::controllers::user_controller;
-use crate::extractors::{errors, user_type, RequireGlobal};
+use crate::extractors::{errors, user_type, RequireUserType};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct SearchUsersRequestBody {
+    pub search_name: String,
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct NewUserRequestBody {
@@ -61,7 +66,7 @@ pub struct DeleteUserRequestBody {
 
 pub async fn list_users(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::ADMIN }, { errors::LIST_USERS }>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_USERS }>,
 ) -> HttpResponse {
     let result: HttpResponse = match user_controller::list_users(data, claims.0).await {
         Ok(res) => res,
@@ -71,9 +76,25 @@ pub async fn list_users(
     result
 }
 
+pub async fn search_users(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_USERS }>,
+    json: web::Json<SearchUsersRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match user_controller::search_users(data, claims.0, body.search_name).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
 pub async fn list_user_types(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::LIST_USER_TYPES }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_USER_TYPES }>,
 ) -> HttpResponse {
     let result: HttpResponse = match user_controller::list_user_types(data, claims.0).await {
         Ok(res) => res,
@@ -83,9 +104,34 @@ pub async fn list_user_types(
     result
 }
 
+pub async fn list_user_status_types(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_USER_TYPES }>,
+) -> HttpResponse {
+    let result: HttpResponse = match user_controller::list_user_status_types(data, claims.0).await {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn list_account_status_types(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_USER_TYPES }>,
+) -> HttpResponse {
+    let result: HttpResponse =
+        match user_controller::list_account_status_types(data, claims.0).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
 pub async fn get_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::GET_USER }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::GET_USER }>,
     json: web::Json<GetUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -100,7 +146,7 @@ pub async fn get_user(
 
 pub async fn new_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::ADMIN }, { errors::CREATE_USER }>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::CREATE_USER }>,
     json: web::Json<NewUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -125,7 +171,7 @@ pub async fn new_user(
 
 pub async fn update_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::ADMIN }, { errors::UPDATE_USER }>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::UPDATE_USER }>,
     json: web::Json<UpdateUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -151,7 +197,7 @@ pub async fn update_user(
 
 pub async fn update_profile(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::UPDATE_PROFILE }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::UPDATE_PROFILE }>,
     json: web::Json<UpdateProfileRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -166,7 +212,7 @@ pub async fn update_profile(
 
 pub async fn update_status(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::UPDATE_STATUS }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::UPDATE_STATUS }>,
     json: web::Json<UpdateStatusRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -182,9 +228,9 @@ pub async fn update_status(
 
 pub async fn logout_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::VIEWER }, { errors::DEFAULT }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::DEFAULT }>,
 ) -> HttpResponse {
-    let result: HttpResponse = match user_controller::logout_user(data, claims.0.user_id).await {
+    let result: HttpResponse = match user_controller::logout_user(data, claims.0).await {
         Ok(res) => res,
         Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
     };
@@ -194,7 +240,7 @@ pub async fn logout_user(
 
 pub async fn delete_user(
     data: web::Data<AppState>,
-    claims: RequireGlobal<{ user_type::ADMIN }, { errors::DELETE_USER }>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::DELETE_USER }>,
     json: web::Json<DeleteUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();

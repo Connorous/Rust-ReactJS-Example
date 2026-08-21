@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, permission_type\n         FROM chat_group_permission_types\n         ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "chat_group_permission_types",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "permission_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "chat_group_permission_types",
+            "name": "permission_type"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "caa1aa79f345e6822e7d39a305b53c14cb4dcf85bf0f09307f2d472bf7095963"
+}

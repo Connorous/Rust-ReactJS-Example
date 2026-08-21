@@ -111,14 +111,13 @@ pub async fn register_user(
             let hashed_password = hash_password(&password);
 
             let result = sqlx::query!(
-                "INSERT INTO users (username, email, name, password, user_type_id, account_status_id)
-                 VALUES ($1, $2, $3, $4, $5, $6)",
+                "INSERT INTO users (username, email, name, password, user_type_id)
+                 VALUES ($1, $2, $3, $4, $5)",
                 username,
                 email,
                 name,
                 hashed_password,
-                4i64,
-                1i64
+                4
             )
             .execute(&pool)
             .await

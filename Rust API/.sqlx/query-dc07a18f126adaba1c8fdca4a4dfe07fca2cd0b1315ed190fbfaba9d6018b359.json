@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users SET\n            bio_info = $1,\n            theme_id = $2,\n            theme_dark_mode = $3,\n            light_theme_primary_colour = $4,\n            light_theme_secondary_colour = $5,\n            light_theme_accent_colour = $6,\n            light_theme_sent_colour = $7,\n            light_theme_received_colour = $8,\n            light_theme_dark_text_colour = $9,\n            light_theme_light_text_colour = $10,\n            dark_theme_primary_colour = $11,\n            dark_theme_secondary_colour = $12,\n            dark_theme_accent_colour = $13,\n            dark_theme_sent_colour = $14,\n            dark_theme_received_colour = $15,\n            dark_theme_dark_text_colour = $16,\n            dark_theme_light_text_colour = $17,\n            updated_at = NOW()\n         WHERE id = $18",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dc07a18f126adaba1c8fdca4a4dfe07fca2cd0b1315ed190fbfaba9d6018b359"
+}
