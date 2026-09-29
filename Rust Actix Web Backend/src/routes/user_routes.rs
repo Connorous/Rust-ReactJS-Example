@@ -5,8 +5,20 @@ use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct ListUsersRequestBody {
+    pub page: i64,
+    pub page_size: i64,
+    pub search: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct SearchUsersRequestBody {
     pub search_name: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct GetUserRequestBody {
+    pub id: i64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -29,14 +41,10 @@ pub struct UpdateUserRequestBody {
 }
 
 #[derive(Deserialize, Clone)]
-pub struct GetUserRequestBody {
-    pub id: i64,
-}
-
-#[derive(Deserialize, Clone)]
 pub struct UpdateProfileRequestBody {
     pub name: String,
     pub bio_info: Option<String>,
+    pub show_name_choice_id: i64,
     pub theme_id: i64,
     pub theme_dark_mode: bool,
     pub light_theme_primary_colour: String,
@@ -68,11 +76,17 @@ pub struct DeleteUserRequestBody {
 pub async fn list_users(
     data: web::Data<AppState>,
     claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_USERS }>,
+    json: ListUsersRequestBody,
 ) -> HttpResponse {
-    let result: HttpResponse = match user_controller::list_users(data, claims.0).await {
-        Ok(res) => res,
-        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-    };
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match user_controller::list_users(data, claims.0, body.page, body.page_size, body.search)
+            .await
+        {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
 
     result
 }

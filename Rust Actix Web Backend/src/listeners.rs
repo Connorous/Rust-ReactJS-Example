@@ -76,12 +76,12 @@ pub async fn pg_listener(pool: PgPool, connections: UserConnections) {
 
 // --- MESSAGES ---
 
-// Push full message object → frontend appends to list
 async fn handle_message_created(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match data["recipient_ids"].as_array() {
             Some(ids) => {
                 let recipient_ids: Vec<i64> = ids.iter().filter_map(|id| id.as_i64()).collect();
+
                 push_to_users(connections, recipient_ids, "message_created", data).await;
             }
             None => {
@@ -94,12 +94,12 @@ async fn handle_message_created(payload: &str, connections: &UserConnections) {
     }
 }
 
-// Push refresh signal → frontend re-fetches conversation
 async fn handle_message_updated(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match data["recipient_ids"].as_array() {
             Some(ids) => {
                 let recipient_ids: Vec<i64> = ids.iter().filter_map(|id| id.as_i64()).collect();
+
                 push_to_users(connections, recipient_ids, "messages_refresh", data).await;
             }
             None => {
@@ -112,12 +112,12 @@ async fn handle_message_updated(payload: &str, connections: &UserConnections) {
     }
 }
 
-// Push refresh signal → frontend re-fetches conversation
 async fn handle_message_deleted(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match data["recipient_ids"].as_array() {
             Some(ids) => {
                 let recipient_ids: Vec<i64> = ids.iter().filter_map(|id| id.as_i64()).collect();
+
                 push_to_users(connections, recipient_ids, "messages_refresh", data).await;
             }
             None => {
@@ -132,7 +132,6 @@ async fn handle_message_deleted(payload: &str, connections: &UserConnections) {
 
 // --- USERS ---
 
-// Push signal to admins → re-fetch users list
 async fn handle_user_created(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => {
@@ -150,23 +149,26 @@ async fn handle_user_created(payload: &str, connections: &UserConnections) {
     }
 }
 
-// Push signal to admins → re-fetch users list
-// Push signal to that user → re-fetch their own record
 async fn handle_user_updated(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => {
             match data["user_id"].as_i64() {
                 Some(user_id) => {
-                    // Notify the updated user to re-fetch their own record
-                    push_to_user(connections, user_id, "user_refresh", data.clone()).await;
-                    // Notify admins to re-fetch users list
-                    push_to_users(
-                        connections,
-                        get_admin_ids(&data),
-                        "users_list_refresh",
-                        data,
-                    )
-                    .await;
+                    // Always notify the user themselves
+                    push_to_user(connections, user_id, "user_updated", data.clone()).await;
+
+                    // Notify friends
+                    let friend_ids = get_friend_ids(&data);
+                    if (!friend_ids.is_empty()) {
+                        push_to_users(connections, friend_ids, "user_updated", data.clone()).await;
+                    }
+
+                    // Only notify admins if admin_ids is not empty
+                    // trigger only includes admin_ids when type or status changed
+                    let admin_ids = get_admin_ids(&data);
+                    if (!admin_ids.is_empty()) {
+                        push_to_users(connections, admin_ids, "users_list_refresh", data).await;
+                    }
                 }
                 None => {
                     log::error!("user_updated payload missing user_id");
@@ -179,8 +181,6 @@ async fn handle_user_updated(payload: &str, connections: &UserConnections) {
     }
 }
 
-// Force logout the suspended user
-// Push signal to admins → re-fetch users list
 async fn handle_user_suspended(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match data["user_id"].as_i64() {
@@ -190,13 +190,6 @@ async fn handle_user_suspended(payload: &str, connections: &UserConnections) {
                     user_id,
                     "force_logout",
                     serde_json::json!({ "reason": "account_suspended" }),
-                )
-                .await;
-                push_to_users(
-                    connections,
-                    get_admin_ids(&data),
-                    "users_list_refresh",
-                    data,
                 )
                 .await;
             }
@@ -210,31 +203,34 @@ async fn handle_user_suspended(payload: &str, connections: &UserConnections) {
     }
 }
 
-// Force logout the deleted user
-// Push signal to admins → re-fetch users list
 async fn handle_user_deleted(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
-        Ok(data) => match data["user_id"].as_i64() {
-            Some(user_id) => {
-                push_to_user(
-                    connections,
-                    user_id,
-                    "force_logout",
-                    serde_json::json!({ "reason": "account_deleted" }),
-                )
-                .await;
-                push_to_users(
-                    connections,
-                    get_admin_ids(&data),
-                    "users_list_refresh",
-                    data,
-                )
-                .await;
+        Ok(data) => {
+            match data["user_id"].as_i64() {
+                Some(user_id) => {
+                    // Force logout deleted user first
+                    push_to_user(
+                        connections,
+                        user_id,
+                        "force_logout",
+                        serde_json::json!({ "reason": "account_deleted" }),
+                    )
+                    .await;
+
+                    // Notify admins to refresh users list
+                    push_to_users(
+                        connections,
+                        get_admin_ids(&data),
+                        "users_list_refresh",
+                        data,
+                    )
+                    .await;
+                }
+                None => {
+                    log::error!("user_deleted payload missing user_id");
+                }
             }
-            None => {
-                log::error!("user_deleted payload missing user_id");
-            }
-        },
+        }
         Err(e) => {
             log::error!("Failed to parse user_deleted payload: {}", e);
         }
@@ -243,12 +239,12 @@ async fn handle_user_deleted(payload: &str, connections: &UserConnections) {
 
 // --- GROUPS ---
 
-// Push signal to all members → re-fetch groups list + group details if open
 async fn handle_group_updated(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match data["member_ids"].as_array() {
             Some(ids) => {
                 let member_ids: Vec<i64> = ids.iter().filter_map(|id| id.as_i64()).collect();
+
                 push_to_users(connections, member_ids, "group_updated", data).await;
             }
             None => {
@@ -261,12 +257,12 @@ async fn handle_group_updated(payload: &str, connections: &UserConnections) {
     }
 }
 
-// Push signal to all members → remove from groups list, redirect if open
 async fn handle_group_deleted(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match data["member_ids"].as_array() {
             Some(ids) => {
                 let member_ids: Vec<i64> = ids.iter().filter_map(|id| id.as_i64()).collect();
+
                 push_to_users(connections, member_ids, "group_deleted", data).await;
             }
             None => {
@@ -281,88 +277,96 @@ async fn handle_group_deleted(payload: &str, connections: &UserConnections) {
 
 // --- GROUP PERMISSIONS ---
 
-// Push signal to added user → re-fetch their groups list
-// Push signal to group members → re-fetch group permissions list
 async fn handle_group_permission_added(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
-        Ok(data) => match data["user_id"].as_i64() {
-            Some(user_id) => {
-                push_to_user(connections, user_id, "groups_refresh", data.clone()).await;
-                push_to_users(
-                    connections,
-                    get_member_ids(&data),
-                    "group_permissions_refresh",
-                    data,
-                )
-                .await;
+        Ok(data) => {
+            match data["user_id"].as_i64() {
+                Some(user_id) => {
+                    // Notify added user to refresh their groups list
+                    push_to_user(connections, user_id, "groups_refresh", data.clone()).await;
+
+                    // Notify existing members to refresh permissions list
+                    push_to_users(
+                        connections,
+                        get_member_ids(&data),
+                        "group_permissions_refresh",
+                        data,
+                    )
+                    .await;
+                }
+                None => {
+                    log::error!("group_permission_added payload missing user_id");
+                }
             }
-            None => {
-                log::error!("group_permission_added payload missing user_id");
-            }
-        },
+        }
         Err(e) => {
             log::error!("Failed to parse group_permission_added payload: {}", e);
         }
     }
 }
 
-// Push signal to affected user → re-fetch their groups list
-// Push signal to group members → re-fetch group permissions list
-// If new permission is blocked → frontend handles redirect
 async fn handle_group_permission_updated(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
-        Ok(data) => match data["user_id"].as_i64() {
-            Some(user_id) => {
-                push_to_user(
-                    connections,
-                    user_id,
-                    "group_permission_updated",
-                    data.clone(),
-                )
-                .await;
-                push_to_users(
-                    connections,
-                    get_member_ids(&data),
-                    "group_permissions_refresh",
-                    data,
-                )
-                .await;
+        Ok(data) => {
+            match data["user_id"].as_i64() {
+                Some(user_id) => {
+                    // Notify affected user of their permission change
+                    push_to_user(
+                        connections,
+                        user_id,
+                        "group_permission_updated",
+                        data.clone(),
+                    )
+                    .await;
+
+                    // Notify existing members to refresh permissions list
+                    push_to_users(
+                        connections,
+                        get_member_ids(&data),
+                        "group_permissions_refresh",
+                        data,
+                    )
+                    .await;
+                }
+                None => {
+                    log::error!("group_permission_updated payload missing user_id");
+                }
             }
-            None => {
-                log::error!("group_permission_updated payload missing user_id");
-            }
-        },
+        }
         Err(e) => {
             log::error!("Failed to parse group_permission_updated payload: {}", e);
         }
     }
 }
 
-// Push signal to removed user → re-fetch their groups list, redirect if open
-// Push signal to group members → re-fetch group permissions list
 async fn handle_group_permission_deleted(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
-        Ok(data) => match data["user_id"].as_i64() {
-            Some(user_id) => {
-                push_to_user(
-                    connections,
-                    user_id,
-                    "group_permission_deleted",
-                    data.clone(),
-                )
-                .await;
-                push_to_users(
-                    connections,
-                    get_member_ids(&data),
-                    "group_permissions_refresh",
-                    data,
-                )
-                .await;
+        Ok(data) => {
+            match data["user_id"].as_i64() {
+                Some(user_id) => {
+                    // Notify removed user to refresh their groups list
+                    push_to_user(
+                        connections,
+                        user_id,
+                        "group_permission_deleted",
+                        data.clone(),
+                    )
+                    .await;
+
+                    // Notify existing members to refresh permissions list
+                    push_to_users(
+                        connections,
+                        get_member_ids(&data),
+                        "group_permissions_refresh",
+                        data,
+                    )
+                    .await;
+                }
+                None => {
+                    log::error!("group_permission_deleted payload missing user_id");
+                }
             }
-            None => {
-                log::error!("group_permission_deleted payload missing user_id");
-            }
-        },
+        }
         Err(e) => {
             log::error!("Failed to parse group_permission_deleted payload: {}", e);
         }
@@ -371,7 +375,6 @@ async fn handle_group_permission_deleted(payload: &str, connections: &UserConnec
 
 // --- RELATIONSHIPS ---
 
-// Push signal to both users → re-fetch relationships list
 async fn handle_relationship_added(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match (data["requester_id"].as_i64(), data["receiver_id"].as_i64()) {
@@ -394,8 +397,6 @@ async fn handle_relationship_added(payload: &str, connections: &UserConnections)
     }
 }
 
-// Push signal to both users → re-fetch relationships list
-// Frontend handles redirect if blocked and DM is open
 async fn handle_relationship_updated(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match (data["requester_id"].as_i64(), data["receiver_id"].as_i64()) {
@@ -418,7 +419,6 @@ async fn handle_relationship_updated(payload: &str, connections: &UserConnection
     }
 }
 
-// Push signal to both users → re-fetch relationships list
 async fn handle_relationship_deleted(payload: &str, connections: &UserConnections) {
     match serde_json::from_str::<serde_json::Value>(payload) {
         Ok(data) => match (data["requester_id"].as_i64(), data["receiver_id"].as_i64()) {
@@ -450,9 +450,15 @@ fn get_admin_ids(data: &serde_json::Value) -> Vec<i64> {
     }
 }
 
-// Extracts member_ids from group permission payloads
 fn get_member_ids(data: &serde_json::Value) -> Vec<i64> {
     match data["member_ids"].as_array() {
+        Some(ids) => ids.iter().filter_map(|id| id.as_i64()).collect(),
+        None => vec![],
+    }
+}
+
+fn get_friend_ids(data: &serde_json::Value) -> Vec<i64> {
+    match data["friend_ids"].as_array() {
         Some(ids) => ids.iter().filter_map(|id| id.as_i64()).collect(),
         None => vec![],
     }

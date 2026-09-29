@@ -1,11 +1,7 @@
-use crate::auth::{
-    build_refresh_cookie, clear_refresh_cookie, generate_access_token, generate_refresh_token,
-    hash_password, verify_password, JwtClaims,
-};
+use crate::auth::{clear_refresh_cookie, hash_password, JwtClaims};
 use crate::routes::user_routes::UpdateProfileRequestBody;
 use crate::state::AppState;
-use actix_web::{web, HttpRequest, HttpResponse};
-use chrono::{Duration, Utc};
+use actix_web::{web, HttpResponse};
 use serde::Serialize;
 
 // --- RESPONSE STRUCTS ---
@@ -35,7 +31,7 @@ struct User {
     status_id: Option<i64>,
     is_online: bool,
     show_name_choice_id: i64,
-    theme_id: Option<i64>,
+    theme_id: i64,
     theme_dark_mode: bool,
     light_theme_primary_colour: String,
     light_theme_secondary_colour: String,
@@ -95,12 +91,15 @@ fn empty_string_check(fields: Vec<&str>) -> bool {
 pub async fn list_users(
     data: web::Data<AppState>,
     claims: JwtClaims,
+    page: i64,
+    page_size: i64,
+    search: Option<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
     let users = sqlx::query_as!(
         UserManageRow,
-        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users ORDER BY id"
+        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1) ORDER BY id LIMIT $2 OFFSET $3", search.map(|s| format!("%{}%", s)), page_size, ((page - 1) * page_size)
     )
     .fetch_all(&pool)
     .await
@@ -181,7 +180,7 @@ pub async fn search_users(
     }
 }
 
-pub async fn list_user_types(
+/*pub async fn list_user_types(
     data: web::Data<AppState>,
     claims: JwtClaims,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -281,7 +280,7 @@ pub async fn list_account_status_types(
             Ok(HttpResponse::Ok().json(response))
         }
     }
-}
+}*/
 
 pub async fn get_user(
     data: web::Data<AppState>,
@@ -581,26 +580,28 @@ pub async fn update_profile(
                 "UPDATE users SET
                 name = $1,
             bio_info = $2,
-            theme_id = $3,
-            theme_dark_mode = $4,
-            light_theme_primary_colour = $5,
-            light_theme_secondary_colour = $6,
-            light_theme_accent_colour = $7,
-            light_theme_sent_colour = $8,
-            light_theme_received_colour = $9,
-            light_theme_dark_text_colour = $10,
-            light_theme_light_text_colour = $11,
-            dark_theme_primary_colour = $12,
-            dark_theme_secondary_colour = $13,
-            dark_theme_accent_colour = $14,
-            dark_theme_sent_colour = $15,
-            dark_theme_received_colour = $16,
-            dark_theme_dark_text_colour = $17,
-            dark_theme_light_text_colour = $18,
+            show_name_choice_id = $3,
+            theme_id = $4,
+            theme_dark_mode = $5,
+            light_theme_primary_colour = $6,
+            light_theme_secondary_colour = $7,
+            light_theme_accent_colour = $8,
+            light_theme_sent_colour = $9,
+            light_theme_received_colour = $10,
+            light_theme_dark_text_colour = $11,
+            light_theme_light_text_colour = $12,
+            dark_theme_primary_colour = $13,
+            dark_theme_secondary_colour = $14,
+            dark_theme_accent_colour = $15,
+            dark_theme_sent_colour = $16,
+            dark_theme_received_colour = $17,
+            dark_theme_dark_text_colour = $18,
+            dark_theme_light_text_colour = $19,
             updated_at = NOW()
-         WHERE id = $19",
+         WHERE id = $20",
                 body.name,
                 body.bio_info,
+                body.show_name_choice_id,
                 body.theme_id,
                 body.theme_dark_mode,
                 body.light_theme_primary_colour,
