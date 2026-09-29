@@ -1138,7 +1138,7 @@ pub async fn update_group_permission(
     let editors_group_permission = sqlx::query!(
         "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
         group_id,
-        user_id
+        claims.user_id
     )
     .fetch_optional(&pool)
     .await
@@ -1260,7 +1260,7 @@ pub async fn delete_group_permission(
     let deletors_group_permission = sqlx::query!(
         "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
         group_id,
-        user_id
+        claims.user_id
     )
     .fetch_optional(&pool)
     .await
