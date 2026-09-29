@@ -1,5 +1,3 @@
--- LOOKUP TABLES
-
 CREATE TABLE user_types (
     id SERIAL PRIMARY KEY,
     type TEXT NOT NULL
@@ -27,13 +25,19 @@ CREATE TABLE themes (
 CREATE TABLE relationship_statuses (
     id SERIAL PRIMARY KEY,
     status TEXT NOT NULL
-    -- 1 pending, 2 accepted, 3 blocked
+    -- 1 pending, 2 accepted, 3 blocked, 4 declined
+);
+
+CREATE TABLE show_name_choices (
+    id SERIAL PRIMARY KEY,
+    choice TEXT NOT NULL
+    -- 1 hidden, 2 friends only, 3 everyone
 );
 
 CREATE TABLE chat_group_permission_types (
     id SERIAL PRIMARY KEY,
     permission_type TEXT NOT NULL
-    -- 1 moderator, 2 member, 3 viewer, 4 blocked
+    -- 1 owner, 2 moderator, 3 member, 4 viewer, 5 pending, 6 declined, 7 blocked
 );
 
 -- CORE TABLES
@@ -45,13 +49,13 @@ CREATE TABLE users (
     name TEXT NOT NULL,
     password TEXT NOT NULL,
     bio_info TEXT,
-    user_type_id BIGSERIAL NOT NULL REFERENCES user_types(id) DEFAULT 4,
-    account_status_id BIGSERIAL NOT NULL REFERENCES account_statuses(id) DEFAULT 1,
-    status_id BIGSERIAL REFERENCES user_statuses(id) DEFAULT 1,
+    user_type_id BIGINT NOT NULL REFERENCES user_types(id) DEFAULT 4,
+    account_status_id BIGINT NOT NULL REFERENCES account_statuses(id) DEFAULT 1,
+    status_id BIGINT REFERENCES user_statuses(id) DEFAULT 1,
     is_online BOOLEAN NOT NULL DEFAULT FALSE,
-    theme_id BIGSERIAL REFERENCES themes(id) DEFAULT 1,
+    theme_id BIGINT NOT NULL REFERENCES themes(id) DEFAULT 1,
     theme_dark_mode BOOLEAN NOT NULL DEFAULT FALSE,
-
+    show_name_choice_id BIGINT NOT NULL REFERENCES show_name_choices(id) DEFAULT 1,
 
     -- Refresh token
     refresh_token TEXT,
@@ -99,6 +103,7 @@ CREATE TABLE user_relationships (
 CREATE TABLE chat_groups (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
     updated_by BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -131,13 +136,82 @@ CREATE TABLE messages (
 
 -- SEED DATA
 
-INSERT INTO user_types (type) VALUES ('Supreme Administrator'), ('Admin'), ('Standard User'), ('Viewer'), ('Blocked');
-INSERT INTO account_statuses (status) VALUES ('Active'), ('Suspended'), ('Closed');
-INSERT INTO user_statuses (status) VALUES ('Online'), ('Idle'), ('Do Not Disturb'), ('Offline');
-INSERT INTO themes (theme) VALUES ('Default'), ('Rounded'), ('Sharp'), ('Gothic'), ('Times Roman');
-INSERT INTO relationship_statuses (status) VALUES ('Pending'), ('Accepted'), ('Blocked'), ('Declined');
-INSERT INTO chat_group_permission_types (permission_type) VALUES ('Owner'), ('Moderator'), ('Member'), ('Viewer'), ('Blocked');
+INSERT INTO user_types (type) VALUES
+    ('Supreme Administrator'),
+    ('Admin'),
+    ('Standard User'),
+    ('Viewer'),
+    ('Blocked');
 
+INSERT INTO account_statuses (status) VALUES
+    ('Active'),
+    ('Suspended'),
+    ('Closed');
+
+INSERT INTO user_statuses (status) VALUES
+    ('Online'),
+    ('Idle'),
+    ('Do Not Disturb'),
+    ('Offline');
+
+INSERT INTO themes (theme) VALUES
+    ('Default'),
+    ('Rounded'),
+    ('Sharp'),
+    ('Gothic'),
+    ('Times Roman');
+
+INSERT INTO relationship_statuses (status) VALUES
+    ('Pending'),
+    ('Accepted'),
+    ('Blocked'),
+    ('Declined');
+
+INSERT INTO show_name_choices (choice) VALUES
+    ('Hidden'),
+    ('Friends Only'),
+    ('Everyone');
+
+INSERT INTO chat_group_permission_types (permission_type) VALUES
+    ('Owner'),
+    ('Moderator'),
+    ('Member'),
+    ('Viewer'),
+    ('Pending'),
+    ('Declined'),
+    ('Blocked');
+
+-- HELPER FUNCTIONS
+
+CREATE OR REPLACE FUNCTION get_admin_ids()
+RETURNS BIGINT[] AS $$
+DECLARE
+    admin_ids BIGINT[];
+BEGIN
+    SELECT ARRAY_AGG(id)
+    INTO admin_ids
+    FROM users
+    WHERE user_type_id <= 2
+    AND account_status_id = 1;
+
+    RETURN admin_ids;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_group_member_ids(p_group_id BIGINT)
+RETURNS BIGINT[] AS $$
+DECLARE
+    member_ids BIGINT[];
+BEGIN
+    SELECT ARRAY_AGG(user_id)
+    INTO member_ids
+    FROM chat_group_permissions
+    WHERE group_id = p_group_id
+    AND permission_type_id NOT IN (5, 6, 7);
+
+    RETURN member_ids;
+END;
+$$ LANGUAGE plpgsql;
 
 -- TRIGGER FUNCTIONS
 
@@ -156,12 +230,11 @@ BEGIN
         FROM user_relationships
         WHERE id = NEW.relationship_id;
     ELSIF NEW.group_id IS NOT NULL THEN
-        SELECT ARRAY_AGG(user_id)
+        recipient_ids := get_group_member_ids(NEW.group_id);
+        SELECT ARRAY_AGG(id)
         INTO recipient_ids
-        FROM chat_group_permissions
-        WHERE group_id = NEW.group_id
-        AND permission_type_id != 4
-        AND user_id != NEW.sender_id;
+        FROM UNNEST(recipient_ids) AS id
+        WHERE id != NEW.sender_id;
     END IF;
 
     PERFORM pg_notify(
@@ -173,6 +246,7 @@ BEGIN
             'group_id', NEW.group_id,
             'message', NEW.message,
             'created_at', NEW.created_at,
+            'updated_at', NEW.updated_at,
             'recipient_ids', recipient_ids
         )::text
     );
@@ -197,12 +271,11 @@ BEGIN
         FROM user_relationships
         WHERE id = NEW.relationship_id;
     ELSIF NEW.group_id IS NOT NULL THEN
-        SELECT ARRAY_AGG(user_id)
+        recipient_ids := get_group_member_ids(NEW.group_id);
+        SELECT ARRAY_AGG(id)
         INTO recipient_ids
-        FROM chat_group_permissions
-        WHERE group_id = NEW.group_id
-        AND permission_type_id != 4
-        AND user_id != NEW.sender_id;
+        FROM UNNEST(recipient_ids) AS id
+        WHERE id != NEW.sender_id;
     END IF;
 
     PERFORM pg_notify(
@@ -211,6 +284,8 @@ BEGIN
             'message_id', NEW.id,
             'relationship_id', NEW.relationship_id,
             'group_id', NEW.group_id,
+            'message', NEW.message,
+            'updated_at', NEW.updated_at,
             'recipient_ids', recipient_ids
         )::text
     );
@@ -235,12 +310,11 @@ BEGIN
         FROM user_relationships
         WHERE id = OLD.relationship_id;
     ELSIF OLD.group_id IS NOT NULL THEN
-        SELECT ARRAY_AGG(user_id)
+        recipient_ids := get_group_member_ids(OLD.group_id);
+        SELECT ARRAY_AGG(id)
         INTO recipient_ids
-        FROM chat_group_permissions
-        WHERE group_id = OLD.group_id
-        AND permission_type_id != 4
-        AND user_id != OLD.sender_id;
+        FROM UNNEST(recipient_ids) AS id
+        WHERE id != OLD.sender_id;
     END IF;
 
     PERFORM pg_notify(
@@ -264,7 +338,18 @@ FOR EACH ROW EXECUTE FUNCTION notify_message_deleted();
 
 CREATE OR REPLACE FUNCTION notify_user_updated()
 RETURNS TRIGGER AS $$
+DECLARE
+    friend_ids BIGINT[];
 BEGIN
+    -- Get accepted friend ids
+    SELECT ARRAY_AGG(
+        CASE WHEN requester_id = NEW.id THEN receiver_id ELSE requester_id END
+    )
+    INTO friend_ids
+    FROM user_relationships
+    WHERE (requester_id = NEW.id OR receiver_id = NEW.id)
+    AND status_id = 2;
+
     PERFORM pg_notify(
         'user_updated',
         json_build_object(
@@ -273,7 +358,14 @@ BEGIN
             'account_status_id', NEW.account_status_id,
             'is_online', NEW.is_online,
             'status_id', NEW.status_id,
-            'admin_ids', get_admin_ids()
+            'friend_ids', friend_ids,
+            -- Only include admin_ids if account_status or user_type changed
+            'admin_ids', CASE
+                WHEN NEW.account_status_id != OLD.account_status_id
+                  OR NEW.user_type_id != OLD.user_type_id
+                THEN get_admin_ids()
+                ELSE ARRAY[]::BIGINT[]
+            END
         )::text
     );
     RETURN NEW;
@@ -287,11 +379,14 @@ FOR EACH ROW EXECUTE FUNCTION notify_user_updated();
 CREATE OR REPLACE FUNCTION notify_user_suspended()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.account_status_id = 2 AND OLD.account_status_id != 2 THEN
+    -- Only notify when going from active to suspended or closed
+    IF (NEW.account_status_id = 2 OR NEW.account_status_id = 3)
+        AND OLD.account_status_id = 1 THEN
         PERFORM pg_notify(
             'user_suspended',
             json_build_object(
-                'user_id', NEW.id
+                'user_id', NEW.id,
+                'account_status_id', NEW.account_status_id
             )::text
         );
     END IF;
@@ -316,6 +411,10 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_created_trigger
+AFTER INSERT ON users
+FOR EACH ROW EXECUTE FUNCTION notify_user_created();
 
 CREATE OR REPLACE FUNCTION notify_user_deleted()
 RETURNS TRIGGER AS $$
@@ -342,16 +441,14 @@ RETURNS TRIGGER AS $$
 DECLARE
     member_ids BIGINT[];
 BEGIN
-    SELECT ARRAY_AGG(user_id)
-    INTO member_ids
-    FROM chat_group_permissions
-    WHERE group_id = NEW.id
-    AND permission_type_id != 4;
+    member_ids := get_group_member_ids(NEW.id);
 
     PERFORM pg_notify(
         'group_updated',
         json_build_object(
             'group_id', NEW.id,
+            'name', NEW.name,
+            'is_public', NEW.is_public,
             'member_ids', member_ids
         )::text
     );
@@ -368,12 +465,7 @@ RETURNS TRIGGER AS $$
 DECLARE
     member_ids BIGINT[];
 BEGIN
-    -- Fetch member_ids before delete so permissions still exist
-    SELECT ARRAY_AGG(user_id)
-    INTO member_ids
-    FROM chat_group_permissions
-    WHERE group_id = OLD.id
-    AND permission_type_id != 4;
+    member_ids := get_group_member_ids(OLD.id);
 
     PERFORM pg_notify(
         'group_deleted',
@@ -481,7 +573,9 @@ BEGIN
             'requester_id', NEW.requester_id,
             'receiver_id', NEW.receiver_id,
             'old_status_id', OLD.status_id,
-            'new_status_id', NEW.status_id
+            'new_status_id', NEW.status_id,
+            'blocked_by', NEW.blocked_by,
+            'declined_by', NEW.declined_by
         )::text
     );
     RETURN NEW;
@@ -510,19 +604,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER relationship_deleted_trigger
 AFTER DELETE ON user_relationships
 FOR EACH ROW EXECUTE FUNCTION notify_relationship_deleted();
-
--- Helper function to get admin ids
-CREATE OR REPLACE FUNCTION get_admin_ids()
-RETURNS BIGINT[] AS $$
-DECLARE
-    admin_ids BIGINT[];
-BEGIN
-    SELECT ARRAY_AGG(id)
-    INTO admin_ids
-    FROM users
-    WHERE user_type_id <= 2
-    AND account_status_id = 1;  -- only active admins
-    
-    RETURN admin_ids;
-END;
-$$ LANGUAGE plpgsql;

@@ -1,0 +1,96 @@
+/* Reset */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Full height foundation */
+html, body, #root {
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--font-family, 'Inter', sans-serif);
+    font-size: var(--font-size, 16px);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+/* Default theme variables — overridden by JS */
+:root {
+    --primary: #1a1a1a;
+    --secondary: #2d2d2d;
+    --accent: #0066ff;
+    --sent-bg: #0066ff;
+    --received-bg: #3d3d3d;
+    --text-on-dark: #ffffff;
+    --text-on-light: #000000;
+    --font-family: 'Inter', sans-serif;
+    --font-size: 16px;
+    --border-radius: 4px;
+}
+
+/* Theme variants — font, border-radius, spacing */
+[data-theme="rounded"] {
+    --border-radius: 16px;
+}
+
+[data-theme="sharp"] {
+    --border-radius: 0px;
+}
+
+[data-theme="gothic"] {
+    --border-radius: 0px;
+    --font-family: 'Times New Roman', serif;
+}
+
+[data-theme="times roman"] {
+    --font-family: 'Times New Roman', serif;
+    --border-radius: 4px;
+}
+
+/* Global text */
+p, span, label, input, button, h1, h2, h3, h4 {
+    color: var(--text-on-dark);
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+}
+
+h1 { font-size: calc(var(--font-size) * 1.5); }
+h2 { font-size: calc(var(--font-size) * 1.3); }
+h3 { font-size: calc(var(--font-size) * 1.1); }
+
+/* Global button reset */
+button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+}
+
+/* Global input reset */
+input, textarea {
+    border: none;
+    outline: none;
+    background: none;
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    color: var(--text-on-dark);
+}
+
+input::placeholder, textarea::placeholder {
+    color: var(--text-on-dark);
+    opacity: 0.5;
+}
