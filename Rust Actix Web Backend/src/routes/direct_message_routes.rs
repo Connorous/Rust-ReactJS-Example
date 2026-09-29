@@ -24,12 +24,14 @@ pub struct SendMessageRequestBody {
 #[derive(Deserialize, Clone)]
 pub struct UpdateMessageRequestBody {
     pub message_id: i64,
+    pub relationship_id: i64,
     pub message: String,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct DeleteMessageRequestBody {
     pub message_id: i64,
+    pub relationship_id: i64,
 }
 
 pub async fn list_messages(
@@ -108,6 +110,7 @@ pub async fn update_message(
         data,
         claims.0,
         body.message_id,
+        body.relationship_id,
         body.message,
     )
     .await
@@ -126,11 +129,17 @@ pub async fn delete_message(
 ) -> HttpResponse {
     let body = json.clone();
 
-    let result: HttpResponse =
-        match direct_message_controller::delete_message(data, claims.0, body.message_id).await {
-            Ok(res) => res,
-            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-        };
+    let result: HttpResponse = match direct_message_controller::delete_message(
+        data,
+        claims.0,
+        body.message_id,
+        body.relationship_id,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
 
     result
 }

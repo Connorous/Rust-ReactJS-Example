@@ -42,7 +42,6 @@ pub struct UpdateUserRequestBody {
 
 #[derive(Deserialize, Clone)]
 pub struct UpdateProfileRequestBody {
-    pub name: String,
     pub bio_info: Option<String>,
     pub show_name_choice_id: i64,
     pub theme_id: i64,
@@ -76,7 +75,7 @@ pub struct DeleteUserRequestBody {
 pub async fn list_users(
     data: web::Data<AppState>,
     claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_USERS }>,
-    json: ListUsersRequestBody,
+    json: web::Json<ListUsersRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
 
@@ -91,23 +90,7 @@ pub async fn list_users(
     result
 }
 
-pub async fn search_users(
-    data: web::Data<AppState>,
-    claims: RequireUserType<{ user_type::ADMIN }, { errors::LIST_USERS }>,
-    json: web::Json<SearchUsersRequestBody>,
-) -> HttpResponse {
-    let body = json.clone();
-
-    let result: HttpResponse =
-        match user_controller::search_users(data, claims.0, body.search_name).await {
-            Ok(res) => res,
-            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-        };
-
-    result
-}
-
-pub async fn list_user_types(
+/*pub async fn list_user_types(
     data: web::Data<AppState>,
     claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_USER_TYPES }>,
 ) -> HttpResponse {
@@ -142,7 +125,7 @@ pub async fn list_account_status_types(
         };
 
     result
-}
+}*/
 
 pub async fn get_user(
     data: web::Data<AppState>,

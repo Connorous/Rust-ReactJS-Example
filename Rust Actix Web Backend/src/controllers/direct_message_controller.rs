@@ -280,7 +280,7 @@ pub async fn search_messages(
                     let mut decrypted_messages: Vec<MessageRow> = Vec::new();
 
                     for mut dm_message in dm_messages {
-                        let mut decrypted_message = match decrypt_message(&dm_message.message) {
+                        let decrypted_message = match decrypt_message(&dm_message.message) {
                             Ok(decypted_text) => decypted_text,
                             Err(_err) => {
                                 let response = Response {
@@ -418,6 +418,7 @@ pub async fn update_message(
     data: web::Data<AppState>,
     claims: JwtClaims,
     message_id: i64,
+    relationship_id: i64,
     message: String,
 ) -> Result<HttpResponse, actix_web::Error> {
     if (message.trim().is_empty()) {
@@ -433,7 +434,8 @@ pub async fn update_message(
 
     let relationship = sqlx::query!(
         "SELECT id, status_id, blocked_by, declined_by FROM user_relationships
-         WHERE id = $1 AND (requester_id = $1 OR receiver_id = $1)",
+         WHERE id = $1 AND (requester_id = $2 OR receiver_id = $2)",
+        relationship_id,
         claims.user_id
     )
     .fetch_optional(&pool)
@@ -539,13 +541,14 @@ pub async fn delete_message(
     data: web::Data<AppState>,
     claims: JwtClaims,
     message_id: i64,
+    relationship_id: i64,
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
     let relationship = sqlx::query!(
         "SELECT id, status_id, blocked_by, declined_by FROM user_relationships
          WHERE id = $1 AND (requester_id = $2 OR receiver_id = $2)",
-        message_id,
+        relationship_id,
         claims.user_id
     )
     .fetch_optional(&pool)

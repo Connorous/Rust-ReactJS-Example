@@ -201,7 +201,7 @@ pub async fn list_user_users_not_in_relationship_with(
     result
 }
 
-pub async fn list_relationship_status_types(
+/*pub async fn list_relationship_status_types(
     data: web::Data<AppState>,
     claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
 ) -> HttpResponse {
@@ -212,7 +212,7 @@ pub async fn list_relationship_status_types(
         };
 
     result
-}
+}*/
 
 pub async fn get_relationship(
     data: web::Data<AppState>,

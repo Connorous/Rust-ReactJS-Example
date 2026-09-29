@@ -444,7 +444,7 @@ pub async fn list_group_permissions(
     result
 }
 
-pub async fn list_group_permission_types(
+/*pub async fn list_group_permission_types(
     data: web::Data<AppState>,
     claims: RequireGroup<
         { user_type::STANDARD_USER },
@@ -464,7 +464,7 @@ pub async fn list_group_permission_types(
         };
 
     result
-}
+}*/
 
 pub async fn add_group_permission(
     data: web::Data<AppState>,

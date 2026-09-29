@@ -9,6 +9,7 @@ use serde::Serialize;
 struct GroupRow {
     id: i64,
     name: String,
+    is_public: bool,
     updated_by: Option<i64>,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
@@ -73,7 +74,7 @@ pub async fn list_groups(
     if (claims.user_type_id <= user_type::ADMIN) {
         let groups = sqlx::query_as!(
             GroupRow,
-            "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups"
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups"
         )
         .fetch_all(&pool)
         .await
@@ -99,7 +100,7 @@ pub async fn list_groups(
     } else {
         let groups = sqlx::query_as!(
             GroupRow,
-            "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
             claims.user_id
         )
         .fetch_all(&pool)
@@ -154,7 +155,7 @@ pub async fn search_groups(
     if (claims.user_type_id <= user_type::ADMIN) {
         let groups = sqlx::query_as!(
             GroupRow,
-            "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $1",
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $1",
             search_like
         )
         .fetch_all(&pool)
@@ -181,7 +182,7 @@ pub async fn search_groups(
     } else {
         let groups = sqlx::query_as!(
             GroupRow,
-            "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $2 AND id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $2 AND id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
             claims.user_id,
             search_like
         )
@@ -218,7 +219,7 @@ pub async fn list_user_groups(
 
     let groups = sqlx::query_as!(
             GroupRow,
-            "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
             user_id
         ) .fetch_all(&pool)
         .await
@@ -271,7 +272,7 @@ pub async fn search_user_groups(
 
     let groups = sqlx::query_as!(
             GroupRow,
-            "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $2 AND id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $2 AND id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
             user_id,
             search_like
         ) .fetch_all(&pool)
@@ -309,28 +310,26 @@ pub async fn list_group_members(
         "SELECT id, username FROM users WHERE id IN (SELECT user_id FROM chat_group_permissions WHERE group_id = $1)",
         group_id
     )
-    .fetch_optional(&pool)
+    .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match members {
-        None => {
-            let response = Response {
-                msg: String::from("No Group Members Found"),
-                success: false,
-            };
+    if (members.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Group Members Found"),
+            empty: true,
+            success: false,
+        };
 
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(members) => {
-            let response = DataResponse {
-                msg: String::from("Success"),
-                data: members,
-                success: true,
-            };
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: members,
+            success: true,
+        };
 
-            Ok(HttpResponse::Ok().json(response))
-        }
+        Ok(HttpResponse::Ok().json(response))
     }
 }
 
@@ -346,29 +345,26 @@ pub async fn list_non_group_members(
         "SELECT id, username FROM users WHERE id NOT IN (SELECT user_id FROM chat_group_permissions WHERE group_id = $1)",
         group_id
     )
-    .fetch_optional(&pool)
+    .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match members {
-        None => {
-            let response = ResponseEmptyList {
-                msg: String::from("No Group Non-Members Found"),
-                empty: true,
-                success: false,
-            };
+    if (members.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Group Non-Members Found"),
+            empty: true,
+            success: false,
+        };
 
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(members) => {
-            let response = DataResponse {
-                msg: String::from("Success"),
-                data: members,
-                success: true,
-            };
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: members,
+            success: true,
+        };
 
-            Ok(HttpResponse::Ok().json(response))
-        }
+        Ok(HttpResponse::Ok().json(response))
     }
 }
 
@@ -384,29 +380,26 @@ pub async fn list_users_who_sent_group_messages(
         "SELECT id, username FROM users WHERE id IN (SELECT sender_id FROM messages WHERE group_id = $1)",
         group_id
     )
-    .fetch_optional(&pool)
+    .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match members {
-        None => {
-            let response = ResponseEmptyList {
-                msg: String::from("No Users Who Sent Messages in this Group Found"),
-                empty: true,
-                success: false,
-            };
+    if (members.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Users Who Sent Messages in this Group Found"),
+            empty: true,
+            success: false,
+        };
 
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(members) => {
-            let response = DataResponse {
-                msg: String::from("Success"),
-                data: members,
-                success: true,
-            };
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: members,
+            success: true,
+        };
 
-            Ok(HttpResponse::Ok().json(response))
-        }
+        Ok(HttpResponse::Ok().json(response))
     }
 }
 
@@ -419,7 +412,7 @@ pub async fn get_group(
 
     let group = sqlx::query_as!(
         GroupRow,
-        "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE id = $1",
+        "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE id = $1",
         group_id
     )
     .fetch_optional(&pool)
@@ -730,10 +723,9 @@ pub async fn search_messages(
         MessageRow,
         "SELECT id, sender_id, group_id, message, created_at, updated_at
          FROM messages
-         WHERE group_id = $1 AND message like $2
+         WHERE group_id = $1
          ORDER BY created_at ASC",
         group_id,
-        message_content
     )
     .fetch_all(&pool)
     .await
@@ -753,7 +745,7 @@ pub async fn search_messages(
             let mut decrypted_messages: Vec<MessageRow> = Vec::new();
 
             for mut chat_message in chat_messages {
-                let mut decrypted_message = match decrypt_message(&chat_message.message) {
+                let decrypted_message = match decrypt_message(&chat_message.message) {
                     Ok(decypted_text) => decypted_text,
                     Err(_err) => {
                         let response = Response {
@@ -765,18 +757,30 @@ pub async fn search_messages(
                     }
                 };
 
-                chat_message.message = decrypted_message;
+                if (decrypted_message.contains(&message_content)) {
+                    chat_message.message = decrypted_message;
 
-                decrypted_messages.push(chat_message);
+                    decrypted_messages.push(chat_message);
+                }
             }
 
-            let response = DataResponse {
-                msg: String::from("Success"),
-                data: decrypted_messages,
-                success: true,
-            };
+            if (decrypted_messages.is_empty()) {
+                let response = ResponseEmptyList {
+                    msg: String::from("No Messages Found for the Filter Content Provided"),
+                    empty: true,
+                    success: false,
+                };
 
-            Ok(HttpResponse::Ok().json(response))
+                Ok(HttpResponse::BadRequest().json(response))
+            } else {
+                let response = DataResponse {
+                    msg: String::from("Success"),
+                    data: decrypted_messages,
+                    success: true,
+                };
+
+                Ok(HttpResponse::Ok().json(response))
+            }
         }
     }
 }
@@ -1010,7 +1014,7 @@ pub async fn list_group_permissions(
     }
 }
 
-pub async fn list_group_permission_types(
+/*pub async fn list_group_permission_types(
     data: web::Data<AppState>,
     claims: JwtClaims,
     group_id: i64,
@@ -1043,7 +1047,7 @@ pub async fn list_group_permission_types(
 
         Ok(HttpResponse::Ok().json(response))
     }
-}
+}*/
 
 pub async fn add_group_permission(
     data: web::Data<AppState>,
@@ -1151,8 +1155,7 @@ pub async fn update_group_permission(
         }
         Some(existing_editors_group_permission) => {
             let group_permission = sqlx::query!(
-                "SELECT id, permission_type_id FROM chat_group_permissions WHERE id = $1 AND group_id = $2 AND user_id = $3",
-                permission_type_id,
+                "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
                 group_id,
                 user_id
             )
@@ -1185,7 +1188,7 @@ pub async fn update_group_permission(
                     } else {
                         let owners = sqlx::query!(
                             "SELECT id
-         FROM chat_group_permissions WHERE permission_type_id = 4 AND group_id = $1
+         FROM chat_group_permissions WHERE permission_type_id = 1 AND group_id = $1
          ORDER BY id",
                             group_id
                         )
@@ -1307,7 +1310,7 @@ pub async fn delete_group_permission(
                     } else {
                         let owners = sqlx::query!(
                             "SELECT id
-         FROM chat_group_permissions WHERE permission_type_id = 4 AND group_id = $1
+         FROM chat_group_permissions WHERE permission_type_id = 1 AND group_id = $1
          ORDER BY id",
                             group_id
                         )

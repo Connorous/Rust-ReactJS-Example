@@ -321,29 +321,27 @@ pub async fn list_user_users_in_relationship_with(data: web::Data<AppState>,
         "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id = $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id = $1)) AND id != $1",
         user_id
     )
-    .fetch_optional(&pool)
+    .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match users {
-        None => {
-            let response = ResponseEmptyList {
+
+    if (users.is_empty()) {
+        let response = ResponseEmptyList {
                 msg: String::from("No Users in Relationships With Found"),
                 empty: true,
                 success: false,
             };
 
             Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(users) => {
-            let response = DataResponse {
+    } else {
+       let response = DataResponse {
                 msg: String::from("Success"),
                 data: users,
                 success: true,
             };
 
             Ok(HttpResponse::Ok().json(response))
-        }
     }
 }
 
@@ -356,34 +354,31 @@ pub async fn list_user_users_not_in_relationship_with(data: web::Data<AppState>,
         "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id != $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id != $1)) AND id != $1",
         user_id
     )
-    .fetch_optional(&pool)
+    .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match users {
-        None => {
-            let response = ResponseEmptyList {
+    if (users.is_empty()) {
+        let response = ResponseEmptyList {
                 msg: String::from("No Users in Not a Relationship With Found"),
                 empty: true,
                 success: false,
             };
 
             Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(users) => {
-            let response = DataResponse {
+    } else {
+       let response = DataResponse {
                 msg: String::from("Success"),
                 data: users,
                 success: true,
             };
 
             Ok(HttpResponse::Ok().json(response))
-        }
     }
 }
 
 
-pub async fn list_relationship_status_types(
+/*pub async fn list_relationship_status_types(
     data: web::Data<AppState>,
     claims: JwtClaims,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -417,7 +412,7 @@ pub async fn list_relationship_status_types(
 
         Ok(HttpResponse::Ok().json(response))
     }
-}
+}*/
 
 
 pub async fn get_relationship(

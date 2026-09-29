@@ -27,7 +27,6 @@ pub fn configure_user_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/users")
             .route("/list", web::post().to(user_routes::list_users))
-            .route("/search", web::post().to(user_routes::search_users))
             .route("/user/new", web::post().to(user_routes::new_user))
             .route("/user/get", web::post().to(user_routes::get_user))
             .route("/user", web::put().to(user_routes::update_user))

@@ -19,7 +19,7 @@ struct DataResponse<T: Serialize> {
     success: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct User {
     id: i64,
     username: String,
@@ -109,61 +109,7 @@ pub async fn list_users(
         true => {
             let response = Response {
                 msg: String::from("No Users Found"),
-                success: false,
-            };
-
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-        false => {
-            let response = DataResponse {
-                msg: String::from("Success"),
-                data: users,
                 success: true,
-            };
-
-            Ok(HttpResponse::Ok().json(response))
-        }
-    }
-}
-
-pub async fn search_users(
-    data: web::Data<AppState>,
-    claims: JwtClaims,
-    search_name: String,
-) -> Result<HttpResponse, actix_web::Error> {
-    if (search_name.is_empty()) {
-        let response = Response {
-            msg: String::from("Must Provide a Username or Email to Search for a User"),
-            success: false,
-        };
-
-        return Ok(HttpResponse::BadRequest().json(response));
-    } else if (search_name.len() < 3) {
-        let response = Response {
-            msg: String::from("Provided Search for Username or Email must be 3 or More Characters"),
-            success: false,
-        };
-
-        return Ok(HttpResponse::BadRequest().json(response));
-    }
-
-    let search_like = format!("%{}%", search_name);
-
-    let pool = data.db.to_owned();
-
-    let users = sqlx::query_as!(
-        UserManageRow,
-        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users WHERE username LIKE $1 or email LIKE $1 or name LIKE $1 ORDER BY id", search_like
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
-
-    match users.is_empty() {
-        true => {
-            let response = Response {
-                msg: String::from("No Users Found"),
-                success: false,
             };
 
             Ok(HttpResponse::BadRequest().json(response))
@@ -578,28 +524,26 @@ pub async fn update_profile(
         Some(theme_) => {
             let result = sqlx::query!(
                 "UPDATE users SET
-                name = $1,
-            bio_info = $2,
-            show_name_choice_id = $3,
-            theme_id = $4,
-            theme_dark_mode = $5,
-            light_theme_primary_colour = $6,
-            light_theme_secondary_colour = $7,
-            light_theme_accent_colour = $8,
-            light_theme_sent_colour = $9,
-            light_theme_received_colour = $10,
-            light_theme_dark_text_colour = $11,
-            light_theme_light_text_colour = $12,
-            dark_theme_primary_colour = $13,
-            dark_theme_secondary_colour = $14,
-            dark_theme_accent_colour = $15,
-            dark_theme_sent_colour = $16,
-            dark_theme_received_colour = $17,
-            dark_theme_dark_text_colour = $18,
-            dark_theme_light_text_colour = $19,
+            bio_info = $1,
+            show_name_choice_id = $2,
+            theme_id = $3,
+            theme_dark_mode = $4,
+            light_theme_primary_colour = $5,
+            light_theme_secondary_colour = $6,
+            light_theme_accent_colour = $7,
+            light_theme_sent_colour = $8,
+            light_theme_received_colour = $9,
+            light_theme_dark_text_colour = $10,
+            light_theme_light_text_colour = $11,
+            dark_theme_primary_colour = $12,
+            dark_theme_secondary_colour = $13,
+            dark_theme_accent_colour = $14,
+            dark_theme_sent_colour = $15,
+            dark_theme_received_colour = $16,
+            dark_theme_dark_text_colour = $17,
+            dark_theme_light_text_colour = $18,
             updated_at = NOW()
-         WHERE id = $20",
-                body.name,
+         WHERE id = $19",
                 body.bio_info,
                 body.show_name_choice_id,
                 body.theme_id,
