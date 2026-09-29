@@ -887,9 +887,21 @@ pub async fn update_message(
                 return Ok(HttpResponse::Forbidden().json(response));
             }
 
+            let encrypted_message = match encrypt_message(message.as_str()) {
+                Ok(ecrypted_text) => ecrypted_text,
+                Err(_err) => {
+                    let response = Response {
+                        msg: String::from("Message Could Not be Encrypted"),
+                        success: true,
+                    };
+
+                    return Ok(HttpResponse::BadRequest().json(response));
+                }
+            };
+
             let result = sqlx::query!(
                 "UPDATE messages SET message = $1, updated_at = NOW() WHERE id = $2",
-                message,
+                encrypted_message,
                 message_id
             )
             .execute(&pool)

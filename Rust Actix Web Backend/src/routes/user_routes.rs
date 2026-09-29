@@ -11,11 +11,6 @@ pub struct ListUsersRequestBody {
     pub search: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct SearchUsersRequestBody {
-    pub search_name: String,
-}
-
 #[derive(Deserialize, Clone)]
 pub struct GetUserRequestBody {
     pub id: i64,
