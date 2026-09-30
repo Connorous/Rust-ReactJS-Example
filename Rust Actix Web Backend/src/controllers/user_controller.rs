@@ -549,7 +549,7 @@ pub async fn update_profile(
         Some(_theme) => {
             let mut result;
 
-            if (update_username) {
+            if (username_update) {
                 result = sqlx::query!(
                     "UPDATE users SET
                 username = $1,
