@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users WHERE username LIKE $1 or email LIKE $1 or name LIKE $1 ORDER BY id",
+  "query": "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1) ORDER BY id LIMIT $2 OFFSET $3",
   "describe": {
     "columns": [
       {
@@ -105,7 +105,9 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Int8",
+        "Int8"
       ]
     },
     "nullable": [
@@ -120,5 +122,5 @@
       false
     ]
   },
-  "hash": "680f4f32ca63c37174044c26bfd2edc863cdd487e22492d2cb2f36b81e932d56"
+  "hash": "b216bcc19632069988573959556e640cbc2767c993308610943272ed2014fe27"
 }

@@ -127,7 +127,7 @@ pub async fn list_groups(
     }
 }
 
-pub async fn search_groups(
+/*pub async fn search_groups(
     data: web::Data<AppState>,
     claims: JwtClaims,
     search_name: String,
@@ -208,7 +208,7 @@ pub async fn search_groups(
             Ok(HttpResponse::Ok().json(response))
         }
     }
-}
+}*/
 
 pub async fn list_user_groups(
     data: web::Data<AppState>,
@@ -244,6 +244,107 @@ pub async fn list_user_groups(
     }
 }
 
+pub async fn search_public_groups(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    search_name: String,
+) -> Result<HttpResponse, actix_web::Error> {
+    if (search_name.is_empty()) {
+        let response = Response {
+            msg: String::from("Must Provide Group Name to Search for Groups"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    } else if (search_name.len() < 3) {
+        let response = Response {
+            msg: String::from("Provided Search must be 3 or More Characters"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+    let search_like = format!("%{}%", search_name);
+
+    let pool = data.db.to_owned();
+
+    let mut groups: Vec<GroupRow> = Vec::new();
+
+    if (claims.user_type_id <= 2) {
+        groups = sqlx::query_as!(
+            GroupRow,
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $1",
+            search_like
+        ) .fetch_all(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    } else {
+        groups = sqlx::query_as!(
+            GroupRow,
+            "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE (is_public = true OR id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $2 AND permission_type_id <= 4)) AND name LIKE $1",
+            search_like,
+            claims.user_id
+        ) .fetch_all(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    }
+
+    if (groups.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Groups Found"),
+            empty: true,
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: groups,
+            success: true,
+        };
+
+        Ok(HttpResponse::Ok().json(response))
+    }
+}
+
+pub async fn get_public_group_details(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    group_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let mut group: Option<GroupRow>;
+
+    if (claims.user_type_id <= 2) {
+        group = sqlx::query_as!(GroupRow, "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE id = $1", group_id).fetch_optional(&pool).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    } else {
+        group = sqlx::query_as!(GroupRow, "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE id = $1 AND (is_public = true OR id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $2 AND permission_type_id <= 4))", group_id, claims.user_id).fetch_optional(&pool).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    }
+
+    match group {
+        None => {
+            let response = Response {
+                msg: String::from("No Groups Found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(_group) => {
+            let response = DataResponse {
+                msg: String::from("No Groups Found"),
+                data: _group,
+                success: true,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+    }
+}
+
 pub async fn search_user_groups(
     data: web::Data<AppState>,
     claims: JwtClaims,
@@ -275,7 +376,7 @@ pub async fn search_user_groups(
             "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $2 AND id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
             user_id,
             search_like
-        ) .fetch_all(&pool)
+        ).fetch_all(&pool)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
@@ -638,61 +739,169 @@ pub async fn list_messages(
     data: web::Data<AppState>,
     claims: JwtClaims,
     group_id: i64,
+    before_message_id: i64,
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let chat_messages = sqlx::query_as!(
-        MessageRow,
-        "SELECT id, sender_id, group_id, message, created_at, updated_at
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing_group {
+        None => {
+            let response = Response {
+                msg: String::from("Group Not Found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Some(_existing_group) => {
+            let mut chat_messages = sqlx::query_as!(
+                MessageRow,
+                "SELECT id, sender_id, group_id, message, created_at, updated_at
          FROM messages
-         WHERE group_id = $1
-         ORDER BY created_at ASC",
-        group_id
+        WHERE group_id = $1 AND ($2::bigint IS NULL OR id < $2)
+        ORDER BY created_at DESC LIMIT 100",
+                group_id,
+                before_message_id,
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            chat_messages.reverse();
+
+            match chat_messages.is_empty() {
+                true => {
+                    let response = ResponseEmptyList {
+                        msg: String::from("No Messages Found"),
+                        empty: true,
+                        success: false,
+                    };
+
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                false => {
+                    let mut decrypted_messages: Vec<MessageRow> = Vec::new();
+
+                    for mut chat_message in chat_messages {
+                        let mut decrypted_message = match decrypt_message(&chat_message.message) {
+                            Ok(decypted_text) => decypted_text,
+                            Err(_err) => {
+                                let response = Response {
+                                    msg: String::from("Messages Could Not be Decrypted"),
+                                    success: true,
+                                };
+
+                                return Ok(HttpResponse::BadRequest().json(response));
+                            }
+                        };
+
+                        chat_message.message = decrypted_message;
+
+                        decrypted_messages.push(chat_message);
+                    }
+
+                    let response = DataResponse {
+                        msg: String::from("Success"),
+                        data: decrypted_messages,
+                        success: true,
+                    };
+
+                    Ok(HttpResponse::Ok().json(response))
+                }
+            }
+        }
+    }
+}
+
+pub async fn get_messages_around(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    group_id: i64,
+    message_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match group {
+        None => {}
+        Some(_group) => {}
+    }
+
+    let mut before_messages = sqlx::query_as!(
+                MessageRow,
+                "SELECT id, sender_id, group_id, message, created_at, updated_at FROM messages WHERE group_id = $1 AND id < $2 ORDER BY id DESC LIMIT 25",
+                group_id,
+                message_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    before_messages.reverse();
+
+    let mut from_messages = sqlx::query_as!(
+        MessageRow,
+        "SELECT id, sender_id, group_id, 
+            message, created_at, updated_at FROM messages WHERE group_id = $1 
+            AND id >= $2 ORDER BY id ASC",
+        group_id,
+        message_id
     )
     .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match chat_messages.is_empty() {
-        true => {
-            let response = ResponseEmptyList {
-                msg: String::from("No Messages Found"),
-                empty: true,
-                success: false,
-            };
+    let mut all_messages = before_messages;
 
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-        false => {
-            let mut decrypted_messages: Vec<MessageRow> = Vec::new();
+    for message in from_messages {
+        all_messages.push(message);
+    }
 
-            for mut chat_message in chat_messages {
-                let mut decrypted_message = match decrypt_message(&chat_message.message) {
-                    Ok(decypted_text) => decypted_text,
-                    Err(_err) => {
-                        let response = Response {
-                            msg: String::from("Messages Could Not be Decrypted"),
-                            success: true,
-                        };
+    if (all_messages.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Messages Found"),
+            empty: true,
+            success: false,
+        };
 
-                        return Ok(HttpResponse::BadRequest().json(response));
-                    }
+        return Ok(HttpResponse::Forbidden().json(response));
+    }
+
+    let mut decrypted_messages: Vec<MessageRow> = Vec::new();
+
+    for mut dm_message in all_messages {
+        let decrypted_message = match decrypt_message(&dm_message.message) {
+            Ok(decypted_text) => decypted_text,
+            Err(_err) => {
+                let response = Response {
+                    msg: String::from("Messages Could Not be Decrypted"),
+                    success: true,
                 };
 
-                chat_message.message = decrypted_message;
-
-                decrypted_messages.push(chat_message);
+                return Ok(HttpResponse::BadRequest().json(response));
             }
+        };
 
-            let response = DataResponse {
-                msg: String::from("Success"),
-                data: decrypted_messages,
-                success: true,
-            };
+        dm_message.message = decrypted_message;
 
-            Ok(HttpResponse::Ok().json(response))
-        }
+        decrypted_messages.push(dm_message);
     }
+
+    let response = DataResponse {
+        msg: String::from("Success"),
+        data: decrypted_messages,
+        success: true,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 pub async fn search_messages(
@@ -859,69 +1068,86 @@ pub async fn update_message(
 
     let pool = data.db.to_owned();
 
-    let existing = sqlx::query!(
-        "SELECT id, sender_id FROM messages WHERE id = $1 AND group_id = $2",
-        message_id,
-        group_id
-    )
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match existing {
+    match existing_group {
         None => {
             let response = Response {
-                msg: String::from("Message Not Found"),
+                msg: String::from("Group Not Found"),
                 success: false,
             };
 
-            Ok(HttpResponse::BadRequest().json(response))
+            Ok(HttpResponse::Ok().json(response))
         }
-        Some(existing_message) => {
-            if (existing_message.sender_id != claims.user_id) {
-                let response = Response {
-                    msg: String::from("You Cannot Edit a Message that was Not Sent by You"),
-                    success: false,
-                };
-
-                return Ok(HttpResponse::Forbidden().json(response));
-            }
-
-            let encrypted_message = match encrypt_message(message.as_str()) {
-                Ok(ecrypted_text) => ecrypted_text,
-                Err(_err) => {
-                    let response = Response {
-                        msg: String::from("Message Could Not be Encrypted"),
-                        success: true,
-                    };
-
-                    return Ok(HttpResponse::BadRequest().json(response));
-                }
-            };
-
-            let result = sqlx::query!(
-                "UPDATE messages SET message = $1, updated_at = NOW() WHERE id = $2",
-                encrypted_message,
-                message_id
+        Some(_existing_group) => {
+            let existing = sqlx::query!(
+                "SELECT id, sender_id FROM messages WHERE id = $1 AND group_id = $2",
+                message_id,
+                group_id
             )
-            .execute(&pool)
+            .fetch_optional(&pool)
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            if (result.rows_affected() > 0) {
-                let response = Response {
-                    msg: String::from("Message Updated Successfully"),
-                    success: true,
-                };
+            match existing {
+                None => {
+                    let response = Response {
+                        msg: String::from("Message Not Found"),
+                        success: false,
+                    };
 
-                Ok(HttpResponse::Ok().json(response))
-            } else {
-                let response = Response {
-                    msg: String::from("Message Not Updated"),
-                    success: false,
-                };
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                Some(existing_message) => {
+                    if (existing_message.sender_id != claims.user_id) {
+                        let response = Response {
+                            msg: String::from("You Cannot Edit a Message that was Not Sent by You"),
+                            success: false,
+                        };
 
-                Ok(HttpResponse::BadRequest().json(response))
+                        return Ok(HttpResponse::Forbidden().json(response));
+                    }
+
+                    let encrypted_message = match encrypt_message(message.as_str()) {
+                        Ok(ecrypted_text) => ecrypted_text,
+                        Err(_err) => {
+                            let response = Response {
+                                msg: String::from("Message Could Not be Encrypted"),
+                                success: true,
+                            };
+
+                            return Ok(HttpResponse::BadRequest().json(response));
+                        }
+                    };
+
+                    let result = sqlx::query!(
+                        "UPDATE messages SET message = $1, updated_at = NOW() WHERE id = $2",
+                        encrypted_message,
+                        message_id
+                    )
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+                    if (result.rows_affected() > 0) {
+                        let response = Response {
+                            msg: String::from("Message Updated Successfully"),
+                            success: true,
+                        };
+
+                        Ok(HttpResponse::Ok().json(response))
+                    } else {
+                        let response = Response {
+                            msg: String::from("Message Not Updated"),
+                            success: false,
+                        };
+
+                        Ok(HttpResponse::BadRequest().json(response))
+                    }
+                }
             }
         }
     }
@@ -935,55 +1161,74 @@ pub async fn delete_message(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let existing = sqlx::query!(
-        "SELECT id, sender_id FROM messages WHERE id = $1 AND group_id = $2",
-        message_id,
-        group_id
-    )
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match existing {
+    match existing_group {
         None => {
             let response = Response {
-                msg: String::from("Message Not Found"),
+                msg: String::from("Group Not Found"),
                 success: false,
             };
 
-            Ok(HttpResponse::BadRequest().json(response))
+            Ok(HttpResponse::Ok().json(response))
         }
-        Some(existing_message) => {
-            if (existing_message.sender_id != claims.user_id
-                && claims.user_type_id > user_type::ADMIN)
-            {
-                let response = Response {
-                    msg: String::from("You Cannot Delete a Message that was Not Sent by You"),
-                    success: false,
-                };
+        Some(_existing_group) => {
+            let existing = sqlx::query!(
+                "SELECT id, sender_id FROM messages WHERE id = $1 AND group_id = $2",
+                message_id,
+                group_id
+            )
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                return Ok(HttpResponse::Forbidden().json(response));
-            }
+            match existing {
+                None => {
+                    let response = Response {
+                        msg: String::from("Message Not Found"),
+                        success: false,
+                    };
 
-            let result = sqlx::query!("DELETE FROM messages WHERE id = $1", message_id)
-                .execute(&pool)
-                .await
-                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                Some(existing_message) => {
+                    if (existing_message.sender_id != claims.user_id
+                        && claims.user_type_id > user_type::ADMIN)
+                    {
+                        let response = Response {
+                            msg: String::from(
+                                "You Cannot Delete a Message that was Not Sent by You",
+                            ),
+                            success: false,
+                        };
 
-            if (result.rows_affected() > 0) {
-                let response = Response {
-                    msg: String::from("Message Deleted Successfully"),
-                    success: true,
-                };
+                        return Ok(HttpResponse::Forbidden().json(response));
+                    }
 
-                Ok(HttpResponse::Ok().json(response))
-            } else {
-                let response = Response {
-                    msg: String::from("Message Not Deleted"),
-                    success: false,
-                };
+                    let result = sqlx::query!("DELETE FROM messages WHERE id = $1", message_id)
+                        .execute(&pool)
+                        .await
+                        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                Ok(HttpResponse::BadRequest().json(response))
+                    if (result.rows_affected() > 0) {
+                        let response = Response {
+                            msg: String::from("Message Deleted Successfully"),
+                            success: true,
+                        };
+
+                        Ok(HttpResponse::Ok().json(response))
+                    } else {
+                        let response = Response {
+                            msg: String::from("Message Not Deleted"),
+                            success: false,
+                        };
+
+                        Ok(HttpResponse::BadRequest().json(response))
+                    }
+                }
             }
         }
     }
@@ -996,33 +1241,50 @@ pub async fn list_group_permissions(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let permissions = sqlx::query_as!(
-        GroupPermissionRow,
-        "SELECT id, group_id, user_id, permission_type_id
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing_group {
+        None => {
+            let response = Response {
+                msg: String::from("Group Not Found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Some(_group) => {
+            let permissions = sqlx::query_as!(
+                GroupPermissionRow,
+                "SELECT id, group_id, user_id, permission_type_id
          FROM chat_group_permissions
          WHERE group_id = $1
          ORDER BY id",
-        group_id
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+                group_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if (permissions.is_empty()) {
-        let response = Response {
-            msg: String::from("No Group Permissions Found"),
-            success: false,
-        };
+            if (permissions.is_empty()) {
+                let response = Response {
+                    msg: String::from("No Group Permissions Found"),
+                    success: false,
+                };
 
-        Ok(HttpResponse::Ok().json(response))
-    } else {
-        let response = DataResponse {
-            msg: String::from("Success"),
-            data: permissions,
-            success: true,
-        };
+                Ok(HttpResponse::Ok().json(response))
+            } else {
+                let response = DataResponse {
+                    msg: String::from("Success"),
+                    data: permissions,
+                    success: true,
+                };
 
-        Ok(HttpResponse::Ok().json(response))
+                Ok(HttpResponse::Ok().json(response))
+            }
+        }
     }
 }
 
@@ -1070,12 +1332,12 @@ pub async fn add_group_permission(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let existing = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
         .fetch_optional(&pool)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match existing {
+    match existing_group {
         None => {
             let response = Response {
                 msg: String::from("Group Not Found"),
@@ -1084,8 +1346,8 @@ pub async fn add_group_permission(
 
             Ok(HttpResponse::BadRequest().json(response))
         }
-        Some(existing_group) => {
-            let existing = sqlx::query!(
+        Some(_existing_group) => {
+            let existing_group = sqlx::query!(
                 "SELECT id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
                 group_id,
                 user_id
@@ -1094,8 +1356,8 @@ pub async fn add_group_permission(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            match existing {
-                Some(_) => {
+            match existing_group {
+                Some(_existing_group) => {
                     let response = Response {
                         msg: String::from("User is Already a Member of this Group"),
                         success: false,
@@ -1138,6 +1400,116 @@ pub async fn add_group_permission(
     }
 }
 
+pub async fn group_request(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    group_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let group = sqlx::query!(
+        "SELECT id, is_public FROM chat_groups WHERE id = $1",
+        group_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match group {
+        None => {
+            let response = Response {
+                msg: String::from("Group Not Found"),
+                success: false,
+            };
+
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        Some(_group) => {
+            if (!_group.is_public && claims.user_type_id > 2) {
+                let response = Response {
+                    msg: String::from("This Group is Not Public"),
+                    success: false,
+                };
+
+                return Ok(HttpResponse::BadRequest().json(response));
+            }
+
+            if (_group.is_public && claims.user_type_id > 2 || claims.user_type_id <= 2) {
+                let existing_permission = sqlx::query!("SELECT permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2", group_id, claims.user_id).fetch_optional(&pool).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+                match existing_permission {
+                    Some(_existing_permission) => {
+                        if (_existing_permission.permission_type_id <= 4) {
+                            let response = Response {
+                                msg: String::from("You Are Already a Member of this Group"),
+                                success: false,
+                            };
+                            return Ok(HttpResponse::BadRequest().json(response));
+                        };
+
+                        if (_existing_permission.permission_type_id == 5) {
+                            let response = Response {
+                                msg: String::from(
+                                    "You Already have a Pending Request for this Group",
+                                ),
+                                success: false,
+                            };
+                            return Ok(HttpResponse::BadRequest().json(response));
+                        };
+
+                        if (_existing_permission.permission_type_id == 6) {
+                            let response = Response {
+                                msg: String::from(
+                                    "Your Request to Join this Group has Aleady being Declined",
+                                ),
+                                success: false,
+                            };
+                            return Ok(HttpResponse::BadRequest().json(response));
+                        };
+
+                        if (_existing_permission.permission_type_id == 7) {
+                            let response = Response {
+                                msg: String::from("You Have been Blocked From this Group"),
+                                success: false,
+                            };
+                            return Ok(HttpResponse::BadRequest().json(response));
+                        };
+
+                        let response = Response {
+                            msg: String::from("You Cannot Request to Join this Group"),
+                            success: false,
+                        };
+                        return Ok(HttpResponse::BadRequest().json(response));
+                    }
+                    None => {
+                        let result = sqlx::query!("INSERT INTO chat_group_permissions (group_id, user_id, permission_type_id) VALUES ($1, $2, $3)", group_id, claims.user_id, 5i64).execute(&pool).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+                        if (result.rows_affected() > 0) {
+                            let response = Response {
+                                msg: String::from("Success"),
+                                success: true,
+                            };
+                            Ok(HttpResponse::Ok().json(response))
+                        } else {
+                            let response = Response {
+                                msg: String::from("Request to Join Group Failed"),
+                                success: false,
+                            };
+                            Ok(HttpResponse::BadRequest().json(response))
+                        }
+                    }
+                }
+            } else {
+                let response = Response {
+                    msg: String::from("User Lacks Permissions to Request Group Access"),
+                    success: false,
+                };
+                Ok(HttpResponse::Ok().json(response))
+            }
+        }
+    }
+}
+
 pub async fn update_group_permission(
     data: web::Data<AppState>,
     claims: JwtClaims,
@@ -1147,7 +1519,22 @@ pub async fn update_group_permission(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let editors_group_permission = sqlx::query!(
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing_group {
+        None => {
+            let response = Response {
+                msg: String::from("Group Not Found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Some(_existing_group) => {
+            let editors_group_permission = sqlx::query!(
         "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
         group_id,
         claims.user_id
@@ -1156,17 +1543,17 @@ pub async fn update_group_permission(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match editors_group_permission {
-        None => {
-            let response = Response {
-                msg: String::from("You Do Not have any Permissions in this Group"),
-                success: false,
-            };
+            match editors_group_permission {
+                None => {
+                    let response = Response {
+                        msg: String::from("You Do Not have any Permissions in this Group"),
+                        success: false,
+                    };
 
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(existing_editors_group_permission) => {
-            let group_permission = sqlx::query!(
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                Some(existing_editors_group_permission) => {
+                    let group_permission = sqlx::query!(
                 "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
                 group_id,
                 user_id
@@ -1175,84 +1562,91 @@ pub async fn update_group_permission(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            match group_permission {
-                None => {
-                    let response = Response {
-                        msg: String::from(
-                            "The Group Permission you are trying to Update does not Exist",
-                        ),
-                        success: false,
-                    };
-
-                    Ok(HttpResponse::BadRequest().json(response))
-                }
-                Some(existing_group_permission) => {
-                    if (existing_group_permission.permission_type_id == group_permission::OWNER
-                        && existing_editors_group_permission.permission_type_id
-                            != group_permission::OWNER)
-                    {
-                        let response = Response {
-                msg: String::from("You Cannot Edit an Owner's Group Permission if you are not an Owner of the Group"),
-                success: false,
-            };
-
-                        Ok(HttpResponse::BadRequest().json(response))
-                    } else {
-                        let owners = sqlx::query!(
-                            "SELECT id
-         FROM chat_group_permissions WHERE permission_type_id = 1 AND group_id = $1
-         ORDER BY id",
-                            group_id
-                        )
-                        .fetch_all(&pool)
-                        .await
-                        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
-
-                        if (owners.is_empty()) {
+                    match group_permission {
+                        None => {
                             let response = Response {
-                                msg: String::from("No Owner Group Permissions List Found"),
-                                success: false,
-                            };
-
-                            return Ok(HttpResponse::Ok().json(response));
-                        } else if (owners.len() == 1) {
-                            let response = Response {
-            msg: String::from("You cannot Edit an Group Owner's Permission if there is only one Current Group Owner"),
-            success: false,
-        };
-
-                            return Ok(HttpResponse::Ok().json(response));
-                        }
-
-                        let result = sqlx::query!(
-                            "UPDATE chat_group_permissions SET
-            permission_type_id = $1,
-            updated_by = $2,
-            updated_at = NOW()
-         WHERE group_id = $3 AND user_id = $4",
-                            permission_type_id,
-                            claims.user_id,
-                            group_id,
-                            user_id
-                        )
-                        .execute(&pool)
-                        .await
-                        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
-
-                        if (result.rows_affected() > 0) {
-                            let response = Response {
-                                msg: String::from("Member Permission Updated Successfully"),
-                                success: true,
-                            };
-
-                            Ok(HttpResponse::Ok().json(response))
-                        } else {
-                            let response = Response {
-                                msg: String::from("Member Permission Not Updated"),
+                                msg: String::from(
+                                    "The Group Permission you are trying to Update does not Exist",
+                                ),
                                 success: false,
                             };
 
                             Ok(HttpResponse::BadRequest().json(response))
+                        }
+                        Some(existing_group_permission) => {
+                            if (existing_group_permission.permission_type_id
+                                == group_permission::OWNER
+                                && existing_editors_group_permission.permission_type_id
+                                    != group_permission::OWNER)
+                            {
+                                let response = Response {
+                msg: String::from("You Cannot Edit an Owner's Group Permission if you are not an Owner of the Group"),
+                success: false,
+            };
+
+                                Ok(HttpResponse::BadRequest().json(response))
+                            } else {
+                                let owners = sqlx::query!(
+                                    "SELECT id
+         FROM chat_group_permissions WHERE permission_type_id = 1 AND group_id = $1
+         ORDER BY id",
+                                    group_id
+                                )
+                                .fetch_all(&pool)
+                                .await
+                                .map_err(|e| {
+                                    actix_web::error::ErrorInternalServerError(e.to_string())
+                                })?;
+
+                                if (owners.is_empty()) {
+                                    let response = Response {
+                                        msg: String::from("No Owner Group Permissions List Found"),
+                                        success: false,
+                                    };
+
+                                    return Ok(HttpResponse::Ok().json(response));
+                                } else if (owners.len() == 1) {
+                                    let response = Response {
+            msg: String::from("You cannot Edit an Group Owner's Permission if there is only one Current Group Owner"),
+            success: false,
+        };
+
+                                    return Ok(HttpResponse::Ok().json(response));
+                                }
+
+                                let result = sqlx::query!(
+                                    "UPDATE chat_group_permissions SET
+            permission_type_id = $1,
+            updated_by = $2,
+            updated_at = NOW()
+         WHERE group_id = $3 AND user_id = $4",
+                                    permission_type_id,
+                                    claims.user_id,
+                                    group_id,
+                                    user_id
+                                )
+                                .execute(&pool)
+                                .await
+                                .map_err(|e| {
+                                    actix_web::error::ErrorInternalServerError(e.to_string())
+                                })?;
+
+                                if (result.rows_affected() > 0) {
+                                    let response = Response {
+                                        msg: String::from("Member Permission Updated Successfully"),
+                                        success: true,
+                                    };
+
+                                    Ok(HttpResponse::Ok().json(response))
+                                } else {
+                                    let response = Response {
+                                        msg: String::from("Member Permission Not Updated"),
+                                        success: false,
+                                    };
+
+                                    Ok(HttpResponse::BadRequest().json(response))
+                                }
+                            }
                         }
                     }
                 }
@@ -1269,7 +1663,22 @@ pub async fn delete_group_permission(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let deletors_group_permission = sqlx::query!(
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing_group {
+        None => {
+            let response = Response {
+                msg: String::from("Group Not Found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Some(_existing_group) => {
+            let deletors_group_permission = sqlx::query!(
         "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
         group_id,
         claims.user_id
@@ -1278,17 +1687,17 @@ pub async fn delete_group_permission(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match deletors_group_permission {
-        None => {
-            let response = Response {
-                msg: String::from("You Do Not have any Permissions in this Group"),
-                success: false,
-            };
+            match deletors_group_permission {
+                None => {
+                    let response = Response {
+                        msg: String::from("You Do Not have any Permissions in this Group"),
+                        success: false,
+                    };
 
-            Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(existing_deletors_group_permission) => {
-            let group_permission = sqlx::query!(
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+                Some(existing_deletors_group_permission) => {
+                    let group_permission = sqlx::query!(
                 "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
                 group_id,
                 user_id
@@ -1297,56 +1706,59 @@ pub async fn delete_group_permission(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            match group_permission {
-                None => {
-                    let response = Response {
-                        msg: String::from(
-                            "The Group Permission you are trying to Delete does not Exist",
-                        ),
-                        success: false,
-                    };
+                    match group_permission {
+                        None => {
+                            let response = Response {
+                                msg: String::from(
+                                    "The Group Permission you are trying to Delete does not Exist",
+                                ),
+                                success: false,
+                            };
 
-                    Ok(HttpResponse::BadRequest().json(response))
-                }
-                Some(existing_group_permission) => {
-                    if (existing_group_permission.permission_type_id == group_permission::OWNER
-                        && existing_deletors_group_permission.permission_type_id
-                            != group_permission::OWNER)
-                    {
-                        let response = Response {
+                            Ok(HttpResponse::BadRequest().json(response))
+                        }
+                        Some(existing_group_permission) => {
+                            if (existing_group_permission.permission_type_id
+                                == group_permission::OWNER
+                                && existing_deletors_group_permission.permission_type_id
+                                    != group_permission::OWNER)
+                            {
+                                let response = Response {
                 msg: String::from("You Cannot Delete an Owner's Group Permission if you are not an Owner of the Group"),
                 success: false,
             };
 
-                        Ok(HttpResponse::BadRequest().json(response))
-                    } else {
-                        let owners = sqlx::query!(
-                            "SELECT id
+                                Ok(HttpResponse::BadRequest().json(response))
+                            } else {
+                                let owners = sqlx::query!(
+                                    "SELECT id
          FROM chat_group_permissions WHERE permission_type_id = 1 AND group_id = $1
          ORDER BY id",
-                            group_id
-                        )
-                        .fetch_all(&pool)
-                        .await
-                        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+                                    group_id
+                                )
+                                .fetch_all(&pool)
+                                .await
+                                .map_err(|e| {
+                                    actix_web::error::ErrorInternalServerError(e.to_string())
+                                })?;
 
-                        if (owners.is_empty()) {
-                            let response = Response {
-                                msg: String::from("No Owner Group Permissions List Found"),
-                                success: false,
-                            };
+                                if (owners.is_empty()) {
+                                    let response = Response {
+                                        msg: String::from("No Owner Group Permissions List Found"),
+                                        success: false,
+                                    };
 
-                            return Ok(HttpResponse::Ok().json(response));
-                        } else if (owners.len() == 1) {
-                            let response = Response {
+                                    return Ok(HttpResponse::Ok().json(response));
+                                } else if (owners.len() == 1) {
+                                    let response = Response {
             msg: String::from("You cannot Delete your Group Owner Permission if You are the Only Group Owner"),
             success: false,
         };
 
-                            return Ok(HttpResponse::Ok().json(response));
-                        }
+                                    return Ok(HttpResponse::Ok().json(response));
+                                }
 
-                        let result = sqlx::query!(
+                                let result = sqlx::query!(
                             "DELETE FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
                             group_id,
                             user_id,
@@ -1355,20 +1767,22 @@ pub async fn delete_group_permission(
                         .await
                         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-                        if (result.rows_affected() > 0) {
-                            let response = Response {
-                                msg: String::from("Member Permission Deleted Successfully"),
-                                success: true,
-                            };
+                                if (result.rows_affected() > 0) {
+                                    let response = Response {
+                                        msg: String::from("Member Permission Deleted Successfully"),
+                                        success: true,
+                                    };
 
-                            Ok(HttpResponse::Ok().json(response))
-                        } else {
-                            let response = Response {
-                                msg: String::from("Member Permission Not Deleted"),
-                                success: false,
-                            };
+                                    Ok(HttpResponse::Ok().json(response))
+                                } else {
+                                    let response = Response {
+                                        msg: String::from("Member Permission Not Deleted"),
+                                        success: false,
+                                    };
 
-                            Ok(HttpResponse::BadRequest().json(response))
+                                    Ok(HttpResponse::BadRequest().json(response))
+                                }
+                            }
                         }
                     }
                 }

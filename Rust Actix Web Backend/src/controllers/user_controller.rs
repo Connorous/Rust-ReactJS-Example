@@ -109,7 +109,7 @@ pub async fn list_users(
         true => {
             let response = Response {
                 msg: String::from("No Users Found"),
-                success: true,
+                success: false,
             };
 
             Ok(HttpResponse::BadRequest().json(response))
@@ -507,6 +507,27 @@ pub async fn update_profile(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
+    let existing_username = sqlx::query!(
+        "SELECT id from users WHERE username = $1 AND id != $2",
+        body.username,
+        claims.user_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing_username {
+        Some(_existing_username) => {
+            let response = Response {
+                msg: String::from("Username entered already Exists"),
+                success: false,
+            };
+
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        None => {}
+    }
+
     let theme_existing = sqlx::query!("SELECT id FROM themes WHERE id = $1", body.theme_id)
         .fetch_optional(&pool)
         .await
@@ -521,30 +542,32 @@ pub async fn update_profile(
 
             Ok(HttpResponse::BadRequest().json(response))
         }
-        Some(theme_) => {
+        Some(_theme) => {
             let result = sqlx::query!(
                 "UPDATE users SET
             bio_info = $1,
-            show_name_choice_id = $2,
-            theme_id = $3,
-            theme_dark_mode = $4,
-            light_theme_primary_colour = $5,
-            light_theme_secondary_colour = $6,
-            light_theme_accent_colour = $7,
-            light_theme_sent_colour = $8,
-            light_theme_received_colour = $9,
-            light_theme_dark_text_colour = $10,
-            light_theme_light_text_colour = $11,
-            dark_theme_primary_colour = $12,
-            dark_theme_secondary_colour = $13,
-            dark_theme_accent_colour = $14,
-            dark_theme_sent_colour = $15,
-            dark_theme_received_colour = $16,
-            dark_theme_dark_text_colour = $17,
-            dark_theme_light_text_colour = $18,
+            name = $2,
+            show_name_choice_id = $3,
+            theme_id = $4,
+            theme_dark_mode = $5,
+            light_theme_primary_colour = $6,
+            light_theme_secondary_colour = $7,
+            light_theme_accent_colour = $8,
+            light_theme_sent_colour = $9,
+            light_theme_received_colour = $10,
+            light_theme_dark_text_colour = $11,
+            light_theme_light_text_colour = $12,
+            dark_theme_primary_colour = $13,
+            dark_theme_secondary_colour = $14,
+            dark_theme_accent_colour = $15,
+            dark_theme_sent_colour = $16,
+            dark_theme_received_colour = $17,
+            dark_theme_dark_text_colour = $18,
+            dark_theme_light_text_colour = $19,
             updated_at = NOW()
-         WHERE id = $19",
+         WHERE id = $20",
                 body.bio_info,
+                body.name,
                 body.show_name_choice_id,
                 body.theme_id,
                 body.theme_dark_mode,

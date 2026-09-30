@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $1)",
+  "query": "SELECT id, sender_id, relationship_id, message, created_at, updated_at FROM messages WHERE relationship_id = $1 AND id < $2 ORDER BY id DESC LIMIT 25",
   "describe": {
     "columns": [
       {
@@ -9,51 +9,62 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "chat_groups",
+            "table": "messages",
             "name": "id"
           }
         }
       },
       {
         "ordinal": 1,
-        "name": "name",
-        "type_info": "Text",
+        "name": "sender_id",
+        "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "chat_groups",
-            "name": "name"
+            "table": "messages",
+            "name": "sender_id"
           }
         }
       },
       {
         "ordinal": 2,
-        "name": "updated_by",
+        "name": "relationship_id",
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "chat_groups",
-            "name": "updated_by"
+            "table": "messages",
+            "name": "relationship_id"
           }
         }
       },
       {
         "ordinal": 3,
-        "name": "created_at",
-        "type_info": "Timestamptz",
+        "name": "message",
+        "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "chat_groups",
-            "name": "created_at"
+            "table": "messages",
+            "name": "message"
           }
         }
       },
       {
         "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "chat_groups",
+            "table": "messages",
             "name": "updated_at"
           }
         }
@@ -61,6 +72,7 @@
     ],
     "parameters": {
       "Left": [
+        "Int8",
         "Int8"
       ]
     },
@@ -69,8 +81,9 @@
       false,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "2add829ed56a209fec5830f7c72eaea3e194487288a60b5cc70e65d1bab43418"
+  "hash": "f7e77fc9021751d061a5973c40d0a63e4b59123a98b75ecabfc17e36c28d475e"
 }

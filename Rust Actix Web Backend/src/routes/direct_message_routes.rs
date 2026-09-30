@@ -7,12 +7,19 @@ use serde::Deserialize;
 #[derive(Deserialize, Clone)]
 pub struct ListMessagesRequestBody {
     pub relationship_id: i64,
+    pub before_message_id: i64,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct SearchMessagesRequestBody {
     pub relationship_id: i64,
     pub message_content: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct GetMessagesAroundBody {
+    pub relationship_id: i64,
+    pub message_id: i64,
 }
 
 #[derive(Deserialize, Clone)]
@@ -45,6 +52,7 @@ pub async fn list_messages(
         data,
         claims.0,
         body.relationship_id,
+        body.before_message_id,
     )
     .await
     {
@@ -67,6 +75,28 @@ pub async fn search_messages(
         claims.0,
         body.relationship_id,
         body.message_content,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn get_messages_around(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::READ_DIRECT_MESSAGES }>,
+    json: web::Json<GetMessagesAroundBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match direct_message_controller::get_messages_around(
+        data,
+        claims.0,
+        body.relationship_id,
+        body.message_id,
     )
     .await
     {

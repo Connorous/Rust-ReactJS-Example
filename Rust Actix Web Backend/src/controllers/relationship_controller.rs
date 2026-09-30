@@ -79,20 +79,18 @@ pub async fn list_relationships(
 pub async fn search_relationships(
     data: web::Data<AppState>,
     claims: JwtClaims,
-    username: String,
-    email: String,
-    search_name: String,
+    search_value: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if (search_name.is_empty()) {
+    if (search_value.is_empty()) {
         let response = Response {
-            msg: String::from("Must Provide a Username or Email to Search for a Relationships"),
+            msg: String::from("Must Provide a Username to Search for a Relationships"),
             success: false,
         };
 
         return Ok(HttpResponse::BadRequest().json(response));
-    } else if (search_name.len() < 3) {
+    } else if (search_value.len() < 3) {
         let response = Response {
-            msg: String::from("Provided Search for Username or Email must be 3 or More Characters"),
+            msg: String::from("Provided Search for Username must be 3 or More Characters"),
             success: false,
         };
 
@@ -100,7 +98,7 @@ pub async fn search_relationships(
     }
 
 
-    let search_like = format!("%{}%", search_name);
+    let search_string = format!("%{}%", search_value);
 
     let pool = data.db.to_owned();
 
@@ -108,12 +106,12 @@ pub async fn search_relationships(
         RelationshipRow,
         "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
          FROM user_relationships
-         WHERE (requester_id = $1 OR receiver_id = $1) AND (requester_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)) OR receiver_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)))))
+         WHERE (requester_id = $1 OR receiver_id = $1) 
+		 AND ((requester_id IN (SELECT id FROM users WHERE username LIKE $2))  
+		 OR (receiver_id IN (SELECT id FROM users WHERE username LIKE $2)))  
          ORDER BY id",
         claims.user_id,
-        search_like,
-        username,
-        email
+        search_string,
     )
     .fetch_all(&pool)
     .await
@@ -147,29 +145,28 @@ pub async fn list_users_in_relationship_with(data: web::Data<AppState>,
         "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id = $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id = $1)) AND id != $1",
         claims.user_id
     )
-    .fetch_optional(&pool)
+    .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match users {
-        None => {
-            let response = ResponseEmptyList {
+
+    if (users.is_empty()) {
+         let response = ResponseEmptyList {
                 msg: String::from("No Users in Relationships With Found"),
                 empty: true,
                 success: false,
             };
 
             Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(users) => {
-            let response = DataResponse {
+    }
+    else {
+        let response = DataResponse {
                 msg: String::from("Success"),
                 data: users,
                 success: true,
             };
 
             Ok(HttpResponse::Ok().json(response))
-        }
     }
 }
 
@@ -182,29 +179,27 @@ pub async fn list_users_not_in_relationship_with(data: web::Data<AppState>,
         "SELECT id, username FROM users WHERE (id IN (SELECT requester_id FROM user_relationships WHERE requester_id != $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id != $1)) AND id != $1",
         claims.user_id
     )
-    .fetch_optional(&pool)
+    .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    match users {
-        None => {
-            let response = ResponseEmptyList {
-                msg: String::from("No Users in Not a Relationship With Found"),
+     if (users.is_empty()) {
+         let response = ResponseEmptyList {
+                msg: String::from("No Users in Relationships With Found"),
                 empty: true,
                 success: false,
             };
 
             Ok(HttpResponse::BadRequest().json(response))
-        }
-        Some(users) => {
-            let response = DataResponse {
+    }
+    else {
+        let response = DataResponse {
                 msg: String::from("Success"),
                 data: users,
                 success: true,
             };
 
             Ok(HttpResponse::Ok().json(response))
-        }
     }
 }
 
@@ -250,18 +245,16 @@ pub async fn search_user_relationships(
     data: web::Data<AppState>,
     claims: JwtClaims,
     user_id: i64,
-    username: String,
-    email: String,
-    search_name: String,
+    search_value: String,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if (search_name.is_empty()) {
+    if (search_value.is_empty()) {
         let response = Response {
             msg: String::from("Must Provide a Username or Email to Search for a Relationships"),
             success: false,
         };
 
         return Ok(HttpResponse::BadRequest().json(response));
-    } else if (search_name.len() < 3) {
+    } else if (search_value.len() < 3) {
         let response = Response {
             msg: String::from("Provided Search for Username or Email must be 3 or More Characters"),
             success: false,
@@ -271,9 +264,7 @@ pub async fn search_user_relationships(
     }
 
 
-    let search_like = format!("%{}%", search_name);
-
-
+    let search_string = format!("%{}%", search_value);
 
     let pool = data.db.to_owned();
 
@@ -281,12 +272,12 @@ pub async fn search_user_relationships(
         RelationshipRow,
         "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
          FROM user_relationships
-         WHERE (requester_id = $1 OR receiver_id = $1) AND (requester_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)) OR receiver_id IN (SELECT id FROM users WHERE ((username LIKE $2 or email LIKE $2) AND (username != $3 AND email != $4)))))
+         WHERE (requester_id = $1 OR receiver_id = $1) 
+         AND (requester_id IN (SELECT id FROM users WHERE ((username LIKE $2 OR email LIKE $2 OR name LIKE $2)) 
+         OR receiver_id IN (SELECT id FROM users WHERE ((username LIKE $2 OR email LIKE $2 OR name LIKE $2)))))
          ORDER BY id",
         user_id, 
-        search_like, 
-        username, 
-        email
+        search_string
     )
     .fetch_all(&pool)
     .await
@@ -437,7 +428,7 @@ pub async fn get_relationship(
     match existing_relationship {
         None => {let response = Response {
             msg: String::from("No Relationship to User Found"),
-            success: true,
+            success: false,
         };
 
         Ok(HttpResponse::Ok().json(response))},

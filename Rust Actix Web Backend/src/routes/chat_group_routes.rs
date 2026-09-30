@@ -4,14 +4,20 @@ use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 
-#[derive(Deserialize, Clone)]
+/*#[derive(Deserialize, Clone)]
 pub struct SearchGroupsRequestBody {
     pub search_name: String,
-}
+}*/
 
 #[derive(Deserialize, Clone)]
 pub struct ListUserGroupsRequestBody {
     pub user_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct SearchPublicGroupsRequestBody {
+    pub user_id: i64,
+    pub search_name: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -26,8 +32,24 @@ pub struct GetGroupRequestBody {
 }
 
 #[derive(Deserialize, Clone)]
+pub struct GetPublicGroupDetailsRequestBody {
+    pub group_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct GetMessagesAroundBody {
+    pub group_id: i64,
+    pub message_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
 pub struct NewGroupRequestBody {
     pub name: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct GroupRequestBody {
+    pub group_id: i64,
 }
 
 #[derive(Deserialize, Clone)]
@@ -44,6 +66,7 @@ pub struct DeleteGroupRequestBody {
 #[derive(Deserialize, Clone)]
 pub struct ListMessagesRequestBody {
     pub group_id: i64,
+    pub before_message_id: i64,
 }
 
 #[derive(Deserialize, Clone)]
@@ -108,9 +131,9 @@ pub async fn list_groups(
     result
 }
 
-pub async fn search_groups(
+/*pub async fn search_groups(
     data: web::Data<AppState>,
-    claims: RequireUserType<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    claims: RequireUserType<{ user_type::Viewer }, { errors::READ_GROUP }>,
     json: web::Json<SearchGroupsRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -122,7 +145,7 @@ pub async fn search_groups(
         };
 
     result
-}
+}*/
 
 pub async fn list_user_groups(
     data: web::Data<AppState>,
@@ -136,6 +159,43 @@ pub async fn list_user_groups(
             Ok(res) => res,
             Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
         };
+
+    result
+}
+
+pub async fn search_public_groups(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    json: web::Json<SearchUserGroupsRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::search_public_groups(data, claims.0, body.search_name).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
+pub async fn get_public_group_details(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::READ_GROUP }>,
+    json: web::Json<GetPublicGroupDetailsRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match chat_group_controller::get_public_group_details(
+        data,
+        claims.0,
+        body.group_id,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
 
     result
 }
@@ -314,11 +374,43 @@ pub async fn list_messages(
 ) -> HttpResponse {
     let body = json.clone();
 
-    let result: HttpResponse =
-        match chat_group_controller::list_messages(data, claims.0, body.group_id).await {
-            Ok(res) => res,
-            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
-        };
+    let result: HttpResponse = match chat_group_controller::list_messages(
+        data,
+        claims.0,
+        body.group_id,
+        body.before_message_id,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
+
+    result
+}
+
+pub async fn get_messages_around(
+    data: web::Data<AppState>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::READ_GROUP },
+    >,
+    json: web::Json<GetMessagesAroundBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse = match chat_group_controller::get_messages_around(
+        data,
+        claims.0,
+        body.group_id,
+        body.message_id,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+    };
 
     result
 }
@@ -489,6 +581,22 @@ pub async fn add_group_permission(
         Ok(res) => res,
         Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
     };
+
+    result
+}
+
+pub async fn group_request(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::STANDARD_USER }, { errors::GROUP_REQUEST }>,
+    json: web::Json<GroupRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::group_request(data, claims.0, body.group_id).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
 
     result
 }

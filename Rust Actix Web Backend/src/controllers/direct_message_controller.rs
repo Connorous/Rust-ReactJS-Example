@@ -1,6 +1,6 @@
 use crate::auth::JwtClaims;
 use crate::encryption::{decrypt_message, encrypt_message};
-use crate::extractors::{errors, permission_error_message, user_type};
+use crate::extractors::user_type;
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
@@ -39,6 +39,7 @@ pub async fn list_messages(
     data: web::Data<AppState>,
     claims: JwtClaims,
     relationship_id: i64,
+    before_message_id: i64,
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
@@ -108,17 +109,20 @@ pub async fn list_messages(
                 }
             }
 
-            let dm_messages = sqlx::query_as!(
+            let mut dm_messages = sqlx::query_as!(
                 MessageRow,
                 "SELECT id, sender_id, relationship_id, message, created_at, updated_at
                  FROM messages
-                 WHERE relationship_id = $1
-                 ORDER BY created_at ASC",
-                relationship_id
+                 WHERE relationship_id = $1 AND ($2::bigint IS NULL OR id < $2)
+                 ORDER BY created_at DESC LIMIT 100",
+                relationship_id,
+                before_message_id,
             )
             .fetch_all(&pool)
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            dm_messages.reverse();
 
             match dm_messages.is_empty() {
                 true => {
@@ -139,7 +143,7 @@ pub async fn list_messages(
                             Err(_err) => {
                                 let response = Response {
                                     msg: String::from("Messages Could Not be Decrypted"),
-                                    success: true,
+                                    success: false,
                                 };
 
                                 return Ok(HttpResponse::BadRequest().json(response));
@@ -160,6 +164,148 @@ pub async fn list_messages(
                     Ok(HttpResponse::Ok().json(response))
                 }
             }
+        }
+    }
+}
+
+pub async fn get_messages_around(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    relationship_id: i64,
+    message_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let relationship = sqlx::query!(
+        "SELECT id, status_id, blocked_by, declined_by FROM user_relationships
+         WHERE id = $1 AND (requester_id = $2 OR receiver_id = $2)",
+        relationship_id,
+        claims.user_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match relationship {
+        None => {
+            let response = Response {
+                msg: String::from("Relationship Not Found"),
+                success: false,
+            };
+
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        Some(_relationship) => {
+            if (!(_relationship.blocked_by.is_none()) && _relationship.status_id == 3) {
+                if (_relationship.blocked_by != Some(claims.user_id)) {
+                    let response = Response {
+                        msg: String::from("You have been Blocked by this User, so you may not view Messages between You and this User"),
+                        success: false,
+                    };
+
+                    return Ok(HttpResponse::Forbidden().json(response));
+                }
+            }
+
+            if (!(_relationship.declined_by.is_none()) && _relationship.status_id == 4) {
+                if (_relationship.declined_by != Some(claims.user_id)) {
+                    let declined_by_user = sqlx::query!(
+                        "SELECT id, user_type_id FROM users WHERE id = $1",
+                        _relationship.declined_by
+                    )
+                    .fetch_optional(&pool)
+                    .await
+                    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+                    match declined_by_user {
+                        None => {}
+                        Some(_declined_by_user) => {
+                            if (_declined_by_user.user_type_id <= user_type::ADMIN) {
+                                let response = Response {
+                        msg: String::from("Your Relationship has been declined by an Admin, so you may not view Messages between You and this User"),
+                        success: false,
+                    };
+
+                                return Ok(HttpResponse::Forbidden().json(response));
+                            } else {
+                                let response = Response {
+                        msg: String::from("Your Relationship has been declined, so you may not view Messages between You and this User"),
+                        success: false,
+                    };
+
+                                return Ok(HttpResponse::Forbidden().json(response));
+                            }
+                        }
+                    }
+                }
+            }
+            let mut before_messages = sqlx::query_as!(
+                MessageRow,
+                "SELECT id, sender_id, relationship_id, message, created_at, updated_at FROM messages WHERE relationship_id = $1 AND id < $2 ORDER BY id DESC LIMIT 25",
+                _relationship.id,
+                message_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            before_messages.reverse();
+
+            let mut from_messages = sqlx::query_as!(
+                MessageRow,
+                "SELECT id, sender_id, relationship_id, 
+            message, created_at, updated_at FROM messages WHERE relationship_id = $1 
+            AND id >= $2 ORDER BY id ASC",
+                _relationship.id,
+                message_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            let mut all_messages = before_messages;
+
+            for message in from_messages {
+                all_messages.push(message);
+            }
+
+            if (all_messages.is_empty()) {
+                let response = ResponseEmptyList {
+                    msg: String::from("No Messages Found"),
+                    empty: true,
+                    success: false,
+                };
+
+                return Ok(HttpResponse::Forbidden().json(response));
+            }
+
+            let mut decrypted_messages: Vec<MessageRow> = Vec::new();
+
+            for mut dm_message in all_messages {
+                let decrypted_message = match decrypt_message(&dm_message.message) {
+                    Ok(decypted_text) => decypted_text,
+                    Err(_err) => {
+                        let response = Response {
+                            msg: String::from("Messages Could Not be Decrypted"),
+                            success: true,
+                        };
+
+                        return Ok(HttpResponse::BadRequest().json(response));
+                    }
+                };
+
+                dm_message.message = decrypted_message;
+
+                decrypted_messages.push(dm_message);
+            }
+
+            let response = DataResponse {
+                msg: String::from("Success"),
+                data: decrypted_messages,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
         }
     }
 }

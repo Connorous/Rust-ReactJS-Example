@@ -11,17 +11,13 @@ pub struct UserId {
 
 #[derive(Deserialize, Clone)]
 pub struct SearchRelationshipRequestBody {
-    pub username: String,
-    pub email: String,
-    pub search_name: String,
+    pub search_value: String,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct SearchUserRelationshipRequestBody {
     pub user_id: i64,
-    pub username: String,
-    pub email: String,
-    pub search_name: String,
+    pub search_value: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -74,9 +70,7 @@ pub async fn search_relationships(
     let result: HttpResponse = match relationship_controller::search_relationships(
         data,
         claims.0,
-        body.username,
-        body.email,
-        body.search_name,
+        body.search_value,
     )
     .await
     {
@@ -145,9 +139,7 @@ pub async fn search_user_relationships(
         data,
         claims.0,
         body.user_id,
-        body.username,
-        body.email,
-        body.search_name,
+        body.search_value,
     )
     .await
     {

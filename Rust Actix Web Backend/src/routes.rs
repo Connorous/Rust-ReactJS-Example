@@ -128,7 +128,7 @@ pub fn configure_chat_group_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/groups")
             // User's own groups
             .route("/list", web::get().to(chat_group_routes::list_groups))
-            .route("/search", web::post().to(chat_group_routes::search_groups))
+            /* .route("/search", web::post().to(chat_group_routes::search_groups))*/
             // Public group discovery
             .route(
                 "/search-public-groups",

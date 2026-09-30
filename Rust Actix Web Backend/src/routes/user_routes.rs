@@ -37,7 +37,9 @@ pub struct UpdateUserRequestBody {
 
 #[derive(Deserialize, Clone)]
 pub struct UpdateProfileRequestBody {
+    pub username: String,
     pub bio_info: Option<String>,
+    pub name: String,
     pub show_name_choice_id: i64,
     pub theme_id: i64,
     pub theme_dark_mode: bool,

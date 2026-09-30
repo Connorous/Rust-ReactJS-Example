@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, name, updated_by, created_at, updated_at FROM chat_groups WHERE name LIKE $1",
+  "query": "SELECT id, name, is_public, updated_by, created_at, updated_at FROM chat_groups WHERE (is_public = true OR id IN (SELECT group_id FROM chat_group_permissions WHERE user_id = $2 AND permission_type_id <= 4)) AND name LIKE $1",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,17 @@
       },
       {
         "ordinal": 2,
+        "name": "is_public",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "chat_groups",
+            "name": "is_public"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
         "name": "updated_by",
         "type_info": "Int8",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -61,10 +72,12 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Int8"
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       true,
@@ -72,5 +85,5 @@
       false
     ]
   },
-  "hash": "c422619087cf6a6cf5c0fa5adf9de7134cfac72b0a40a8b4d6b37cb0f2a27cc0"
+  "hash": "a374b70eec068ed45bcacef65f426cca3cf20a2b185c54e1aa977520dabc0f34"
 }
