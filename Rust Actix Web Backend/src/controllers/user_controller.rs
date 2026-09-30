@@ -507,25 +507,29 @@ pub async fn update_profile(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let existing_username = sqlx::query!(
-        "SELECT id from users WHERE username = $1 AND id != $2",
-        body.username,
-        claims.user_id
-    )
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let mut username_update = false;
 
-    match existing_username {
-        Some(_existing_username) => {
-            let response = Response {
-                msg: String::from("Username entered already Exists"),
-                success: false,
-            };
+    if (!body.username.is_empty()) {
+        let existing_username = sqlx::query!(
+            "SELECT id from users WHERE username = $1 AND id != $2",
+            body.username,
+            claims.user_id
+        )
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            return Ok(HttpResponse::BadRequest().json(response));
+        match existing_username {
+            Some(_existing_username) => {
+                let response = Response {
+                    msg: String::from("Username entered already Exists"),
+                    success: false,
+                };
+
+                return Ok(HttpResponse::BadRequest().json(response));
+            }
+            None => username_update = true,
         }
-        None => {}
     }
 
     let theme_existing = sqlx::query!("SELECT id FROM themes WHERE id = $1", body.theme_id)
@@ -543,8 +547,61 @@ pub async fn update_profile(
             Ok(HttpResponse::BadRequest().json(response))
         }
         Some(_theme) => {
-            let result = sqlx::query!(
-                "UPDATE users SET
+            let mut result;
+
+            if (update_username) {
+                result = sqlx::query!(
+                    "UPDATE users SET
+                username = $1,
+            bio_info = $2,
+            name = $3,
+            show_name_choice_id = $4,
+            theme_id = $5,
+            theme_dark_mode = $6,
+            light_theme_primary_colour = $7,
+            light_theme_secondary_colour = $8,
+            light_theme_accent_colour = $9,
+            light_theme_sent_colour = $10,
+            light_theme_received_colour = $11,
+            light_theme_dark_text_colour = $12,
+            light_theme_light_text_colour = $13,
+            dark_theme_primary_colour = $14,
+            dark_theme_secondary_colour = $15,
+            dark_theme_accent_colour = $16,
+            dark_theme_sent_colour = $17,
+            dark_theme_received_colour = $18,
+            dark_theme_dark_text_colour = $19,
+            dark_theme_light_text_colour = $20,
+            updated_at = NOW()
+         WHERE id = $21",
+                    body.username,
+                    body.bio_info,
+                    body.name,
+                    body.show_name_choice_id,
+                    body.theme_id,
+                    body.theme_dark_mode,
+                    body.light_theme_primary_colour,
+                    body.light_theme_secondary_colour,
+                    body.light_theme_accent_colour,
+                    body.light_theme_sent_colour,
+                    body.light_theme_received_colour,
+                    body.light_theme_dark_text_colour,
+                    body.light_theme_light_text_colour,
+                    body.dark_theme_primary_colour,
+                    body.dark_theme_secondary_colour,
+                    body.dark_theme_accent_colour,
+                    body.dark_theme_sent_colour,
+                    body.dark_theme_received_colour,
+                    body.dark_theme_dark_text_colour,
+                    body.dark_theme_light_text_colour,
+                    claims.user_id
+                )
+                .execute(&pool)
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+            } else {
+                result = sqlx::query!(
+                    "UPDATE users SET
             bio_info = $1,
             name = $2,
             show_name_choice_id = $3,
@@ -566,30 +623,31 @@ pub async fn update_profile(
             dark_theme_light_text_colour = $19,
             updated_at = NOW()
          WHERE id = $20",
-                body.bio_info,
-                body.name,
-                body.show_name_choice_id,
-                body.theme_id,
-                body.theme_dark_mode,
-                body.light_theme_primary_colour,
-                body.light_theme_secondary_colour,
-                body.light_theme_accent_colour,
-                body.light_theme_sent_colour,
-                body.light_theme_received_colour,
-                body.light_theme_dark_text_colour,
-                body.light_theme_light_text_colour,
-                body.dark_theme_primary_colour,
-                body.dark_theme_secondary_colour,
-                body.dark_theme_accent_colour,
-                body.dark_theme_sent_colour,
-                body.dark_theme_received_colour,
-                body.dark_theme_dark_text_colour,
-                body.dark_theme_light_text_colour,
-                claims.user_id
-            )
-            .execute(&pool)
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+                    body.bio_info,
+                    body.name,
+                    body.show_name_choice_id,
+                    body.theme_id,
+                    body.theme_dark_mode,
+                    body.light_theme_primary_colour,
+                    body.light_theme_secondary_colour,
+                    body.light_theme_accent_colour,
+                    body.light_theme_sent_colour,
+                    body.light_theme_received_colour,
+                    body.light_theme_dark_text_colour,
+                    body.light_theme_light_text_colour,
+                    body.dark_theme_primary_colour,
+                    body.dark_theme_secondary_colour,
+                    body.dark_theme_accent_colour,
+                    body.dark_theme_sent_colour,
+                    body.dark_theme_received_colour,
+                    body.dark_theme_dark_text_colour,
+                    body.dark_theme_light_text_colour,
+                    claims.user_id
+                )
+                .execute(&pool)
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+            }
 
             if (result.rows_affected() > 0) {
                 let response = Response {

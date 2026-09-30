@@ -262,7 +262,7 @@ pub async fn update_relationship(
 
 pub async fn block_relationship(
     data: web::Data<AppState>,
-    claims: RequireUserType<{ user_type::VIEWER }, { errors::UPDATE_RELATIONSHIP }>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::BLOCK_RELATIONSHIP }>,
     json: web::Json<BlockRelationshipRequestBody>,
 ) -> HttpResponse {
     let body: BlockRelationshipRequestBody = json.clone();
