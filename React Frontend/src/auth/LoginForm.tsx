@@ -2,7 +2,6 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import type { LoginResponse } from '../types/api';
-import type { UserType, AccountStatus } from '../types/user';
 import './login.css';
 
 function Login() {
@@ -11,6 +10,7 @@ function Login() {
         setAccessToken,
         setSessionUser,
         setThemes,
+        setShowNameChoices,
         setUserTypes,
         setUserStatuses,
         setAccountStatuses,
@@ -199,6 +199,7 @@ function Login() {
                 setAccessToken(data.access_token!);
                 setSessionUser(data.user!);
                 setThemes(data.themes!);
+                setShowNameChoices(data.show_name_choices!);
                 setUserTypes(data.user_types!);
                 setUserStatuses(data.user_statuses!);
                 setAccountStatuses(data.account_statuses!);

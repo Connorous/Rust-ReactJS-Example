@@ -6,10 +6,11 @@ import RequestsList from '../relationships/RequestsList';
 import DMList from '../directMessages/DMList';
 import GroupList from '../chatGroups/GroupList';
 import UserList from '../users/UserList';
+import { UIContext } from '../context/UIContext';
 
 function Sidebar() {
-    const { sessionUser, isDesktop, setSelectedProfileId } = useContext(AuthContext);
-   
+    const { sessionUser, isDesktop } = useContext(AuthContext);
+    const { setSelectedProfileId } = useContext(UIContext);
 
     const navigate = useNavigate();
 

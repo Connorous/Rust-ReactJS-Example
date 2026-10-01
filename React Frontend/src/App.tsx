@@ -5,7 +5,7 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext.tsx';
 import { WSContext } from './context/WSContext.tsx';
 import Layout from './layout/Layout.tsx';
-import type { User, Theme, UserType, AccountStatus, UserStatus } from './types/user.ts';
+import type { User, Theme, UserType, AccountStatus, UserStatus, ShowNameChoice } from './types/user.ts';
 import type { RelationshipStatus } from './types/relationship.ts';
 import type { GroupPermissionType } from './types/group.ts';
 import { UIProvider } from './context/UIContext.tsx';
@@ -60,6 +60,14 @@ function App() {
         }
     });
 
+    const [showNameChoices, setShowNameChoices] = useState<ShowNameChoice[]>(() => {
+        try {
+            return JSON.parse(localStorage.getItem('showNameChoices') ?? '[]');
+        } catch {
+            return [];
+        }
+    });
+
     const [accountStatuses, setAccountStatuses] = useState<AccountStatus[]>(() => {
         try {
             return JSON.parse(localStorage.getItem('accountStatuses') ?? '[]');
@@ -96,6 +104,9 @@ function App() {
     }, [themes]);
     useEffect(() => {
         localStorage.setItem('userStatuses', JSON.stringify(userStatuses));
+    }, [themes]);
+    useEffect(() => {
+        localStorage.setItem('showNameChoices', JSON.stringify(showNameChoices));
     }, [themes]);
     useEffect(() => {
         localStorage.setItem('accountStatuses', JSON.stringify(accountStatuses));
@@ -251,6 +262,26 @@ function App() {
         ws.onmessage = (event) => {
             try {
                 const { event: eventName, data } = JSON.parse(event.data);
+
+                if (eventName === 'force_logout') {
+                    logout();
+                    return;
+                }
+
+                if (eventName === 'user_update' && data.user_id === sessionUser?.id) {
+                    if (data.user_type === 5 || data.account_status === 1) {
+                        logout();
+                        return;
+                    }
+                    setSessionUser((prev: User | null) => prev ? {
+                        ...prev,
+                        user_type_id: data.user_type,
+                        account_status: data.account_status,
+                        is_online: data.is_online,
+                        status_id: data.status_id,
+                        } : null);
+                        return;
+                }
                 const callbacks = listenersRef.current[eventName] ?? [];
                 callbacks.forEach(cb => cb(data));
             } catch {
@@ -294,6 +325,8 @@ function App() {
                 setUserTypes,
                 userStatuses,
                 setUserStatuses,
+                showNameChoices,
+                setShowNameChoices,
                 accountStatuses,
                 setAccountStatuses,
                 relationshipStatuses,

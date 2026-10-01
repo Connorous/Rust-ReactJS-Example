@@ -8,7 +8,7 @@ export interface User {
     account_status_id: number;
     status_id: number | null;
     is_online: boolean;
-    show_name_choice: number;
+    show_name_choice_id: number;
     theme_id: number;
     theme_dark_mode: boolean;
 

@@ -7,6 +7,7 @@ function Logout() {
         accessToken,
         setAccessToken,
         setSessionUser,
+        setShowNameChoices,
         setThemes,
         setUserTypes,
         setAccountStatuses,
@@ -43,12 +44,15 @@ function Logout() {
         setAccountStatuses([]);
         setRelationshipStatuses([]);
         setGroupPermissionTypes([]);
+        setShowNameChoices([]);
 
         navigate('/login');
     }
 
     performLogout();
 }, []);
+
+    return (<></>);
 }
 
 export default Logout;

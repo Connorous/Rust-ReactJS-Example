@@ -103,7 +103,7 @@ function Profile() {
         setBio(user.bio_info ?? '');
         setThemeId(user.theme_id);
         setDarkMode(user.theme_dark_mode);
-        setShowNameChoiceId(user.show_name_choice);
+        setShowNameChoiceId(user.show_name_choice_id);
         setLightPrimary(user.light_theme_primary_colour);
         setLightSecondary(user.light_theme_secondary_colour);
         setLightAccent(user.light_theme_accent_colour);
@@ -203,8 +203,8 @@ function Profile() {
 
     function shouldShowRealName(): boolean {
         if (!profileUser) return false;
-        if (profileUser.show_name_choice === 3) return true;
-        if (profileUser.show_name_choice === 2 && isFriend()) return true;
+        if (profileUser.show_name_choice_id === 3) return true;
+        if (profileUser.show_name_choice_id === 2 && isFriend()) return true;
         return false;
     }
 
@@ -282,7 +282,7 @@ function Profile() {
                         bio_info: bio || null,
                         theme_id: themeId,
                         theme_dark_mode: darkMode,
-                        show_name_choice: showNameChoiceId,
+                        show_name_choice_id: showNameChoiceId,
                         light_theme_primary_colour: lightPrimary,
                         light_theme_secondary_colour: lightSecondary,
                         light_theme_accent_colour: lightAccent,
