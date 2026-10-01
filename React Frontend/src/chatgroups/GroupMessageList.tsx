@@ -1,50 +1,70 @@
 import type { GroupPermission, GroupMember } from '../types/group';
+import type { Message } from '../types/message';
 import type { User } from '../types/user';
-import GroupMemberViewHolder from './GroupMemberViewHolder';
+import GroupMessageViewHolder from './GroupMessageViewHolder';
 import './chatGroups.css';
 
-interface GroupMemberListProps {
-    members: GroupMember[];
-    permissions: GroupPermission[];
+interface GroupMessageListProps {
+    messages: Message[];
     groupId: number;
     sessionUser: User;
-    groupPermission: GroupPermission;
-    onMembersUpdated: () => void;
+    fetchMessages: () => void;
+    messagesEndRef: React.RefObject<HTMLDivElement| null>;
+    messageListRef: React.RefObject<HTMLDivElement| null>;
+    hasMore: boolean;
+    loadingMore: boolean;
+    onScrollTop: () => void;
 }
 
-function GroupMemberList({
-    members,
-    permissions,
+function GroupMessageList({
+    messages,
     groupId,
     sessionUser,
-    groupPermission,
-    onMembersUpdated,
-}: GroupMemberListProps) {
-    if (members.length === 0) {
+    fetchMessages,
+    messagesEndRef, 
+    messageListRef,
+    hasMore, 
+    loadingMore,
+    onScrollTop
+}: GroupMessageListProps) {
+    function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+        const div = e.currentTarget; 
+        if (div.scrollTop < 50 && hasMore && !loadingMore) {
+            onScrollTop();
+        }
+    }
+    
+    
+    if (messages.length === 0) {
         return (
             <>
-                <p className="group-info-empty">No members found</p>
+                <div className="group-message-list">
+                    <p className="group-message-list-empty">No messages yet, say hello!</p>
+                    <div ref={messagesEndRef} />
+                </div>
             </>
         );
     }
 
     return (
         <>
-            <div className="group-member-list">
-                {members.map(member => (
-                    <GroupMemberViewHolder
-                        key={member.id}
-                        member={member}
-                        permissions={permissions}
-                        groupId={groupId}
+            <div className="group-message-list" ref={messageListRef} onScroll={(e) => handleScroll(e)}>
+                {loadingMore ? (<> <p className='group-message-list-loading'> Loading More Messages...</p></>) : (<></>)}
+                {hasMore ? (<> <p className='group-message-list-end'> No More Messages</p></>) : (<></>)}
+
+                {messages.map(message => (
+                    <GroupMessageViewHolder
+                        key={message.id}
+                        message={message}
                         sessionUser={sessionUser}
-                        groupPermission={groupPermission}
-                        onMembersUpdated={onMembersUpdated}
+                        groupId={groupId}
+                        fetchMessages={fetchMessages}
                     />
                 ))}
+                <div ref={messagesEndRef} />
             </div>
         </>
     );
 }
 
-export default GroupMemberList;
+export default GroupMessageList;

@@ -54,6 +54,7 @@ function MessageViewHolder({ message, sessionUser, relationshipId, getMessages }
                 },
                 body: JSON.stringify({
                     message_id: message.id,
+                    relationship_id: relationshipId,
                     message: content,
                 }),
             });
@@ -85,6 +86,7 @@ function MessageViewHolder({ message, sessionUser, relationshipId, getMessages }
                 },
                 body: JSON.stringify({
                     message_id: message.id,
+                    relationship_id: relationshipId,
                 }),
             });
 

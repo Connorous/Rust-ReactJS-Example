@@ -23,6 +23,7 @@ interface AuthContextType {
     groupPermissionTypes: GroupPermissionType[];
     setGroupPermissionTypes: (types: GroupPermissionType[]) => void;
     clearRefreshTimeout: () => void; 
+    logout: () => void;
     API_URL: string;
     SECRET: string;
     isDesktop: boolean;

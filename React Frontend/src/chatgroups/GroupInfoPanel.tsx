@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useWSEvent } from '../hooks/useWSEvent';
 import ConfirmModal from '../shared/ConfirmModel';
-import GroupMemberList from './GroupMemberViewHolder';
+//import GroupMemberList from './GroupMemberViewHolder';
 import type { Group, GroupPermission, GroupMember } from '../types/group';
 import type { User } from '../types/user';
 import type { ApiResponse } from '../types/api';

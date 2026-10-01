@@ -3,7 +3,7 @@ import { createContext, useState } from 'react';
 interface UIContextType {
     // Last selected items
     lastSelectedProfileId: number | null;
-    setSelectedProfileId: (id: number | null) => void;
+    setLastSelectedProfileId: (id: number | null) => void;
     lastSelectedDM: number | null;
     setLastSelectedDM: (id: number | null) => void;
     lastSelectedFriend: number | null;
@@ -25,7 +25,7 @@ interface UIContextType {
 export const UIContext = createContext<UIContextType>({} as UIContextType);
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
-    const [lastSelectedProfileId, setSelectedProfileId] = useState<number | null>(null);
+    const [lastSelectedProfileId, setLastSelectedProfileId] = useState<number | null>(null);
     const [lastSelectedDM, setLastSelectedDM] = useState<number | null>(null);
     const [lastSelectedFriend, setLastSelectedFriend] = useState<number | null>(null);
     const [lastSelectedGroup, setLastSelectedGroup] = useState<number | null>(null);
@@ -36,7 +36,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     return (
         <UIContext.Provider value={{
             lastSelectedProfileId,
-            setSelectedProfileId,
+            setLastSelectedProfileId,
             lastSelectedDM,
             setLastSelectedDM,
             lastSelectedFriend,

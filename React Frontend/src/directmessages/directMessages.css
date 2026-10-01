@@ -105,6 +105,22 @@
     font-size: 14px;
 }
 
+.message-loading {
+    color: var(--text-on-dark);
+    opacity: 0.7;
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+}
+
+.message-end {
+    color: var(--text-on-dark);
+    opacity: 0.7;
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+}
+
 /* Message holder */
 .message-holder {
     display: flex;

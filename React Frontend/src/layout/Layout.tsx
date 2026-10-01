@@ -7,8 +7,8 @@ import Logout from '../auth/Logout';
 import TopBar from './TopBar';
 import SideBar from './SideBar';
 import ManageUsers from '../users/ManageUsers';
-import DirectMessages from '../directMessages/DirectMessages';
-import ChatGroups from '../chatGroups/ChatGroups';
+import DirectMessages from '../directmessages/DirectMessages';
+import ChatGroups from '../chatgroups/ChatGroups';
 import Relationships from '../relationships/Relationships';
 import Profile from '../profile/Profile';
 
@@ -80,6 +80,7 @@ function Layout() {
                     <Route path="/" element={<Navigate to="/direct-messages" />} />
                     <Route path="/direct-messages" element={<DirectMessages />} />
                     <Route path="/chat-groups" element={<ChatGroups />} />
+                    <Route path="/find-friends" element={<FindFriends />} />
                     <Route path="/relationships" element={<Relationships />} />
                     <Route path="/profile" element={<Profile />} />
                     {sessionUser.user_type_id <= 2 && (

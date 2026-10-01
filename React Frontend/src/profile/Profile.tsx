@@ -29,6 +29,7 @@ function Profile() {
     const [error, setError] = useState('');
 
     // Profile fields
+     const [username, setUsername] = useState('');
     const [name, setName] = useState('');
     const [bio, setBio] = useState('');
     const [showNameChoiceId, setShowNameChoiceId] = useState<number>(1);
@@ -58,6 +59,7 @@ function Profile() {
     const [updateSuccess, setUpdateSuccess] = useState('');
     const [updateLoading, setUpdateLoading] = useState(false);
 
+    var us: string = username;
     var nm: string = name;
     var bi: string = bio;
     var snc: number = showNameChoiceId;
@@ -100,6 +102,8 @@ function Profile() {
     }, [sessionUser]);
 
     function populateFieldsWithCurrentUserDetails(user: User) {
+        setUsername(user.username);
+        setName(user.name);
         setBio(user.bio_info ?? '');
         setThemeId(user.theme_id);
         setDarkMode(user.theme_dark_mode);
@@ -228,15 +232,17 @@ function Profile() {
     }
 
     function validateName() {
-        if (name === '') {
-            setUpdateError('Name Cannot be Empty');
+        if (username === '' || name === '') {
+            setUpdateError('Username or Name Cannot be Empty');
             return false;
         }
+        
+        return true;
     }
 
     async function updateProfile() {
-        if (!validateColours()) return;
-        if (!validateName()) return;
+        if (validateColours() === false) return;
+        if (validateName() === false) return;
 
         setUpdateLoading(true);
         setUpdateError('');
@@ -250,6 +256,7 @@ function Profile() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    username: username,
                     name: name,
                     bio_info: bio,
                     theme_id: themeId,
@@ -278,6 +285,7 @@ function Profile() {
                 if (sessionUser) {
                     const updatedUser: User = {
                         ...sessionUser,
+                        username: username,
                         name: name,
                         bio_info: bio || null,
                         theme_id: themeId,
@@ -425,6 +433,17 @@ function Profile() {
                             <span>{sessionUser!.is_online ? 'Online' : 'Offline'}</span>
                         </div>
                     </div>
+                </div>
+
+                <div className="profile-section">
+                        <label className="profile-label">Username</label>
+                        <input
+                            className="profile-colour-input"
+                            type="text"
+                            placeholder="#ffffff"
+                            value={us}
+                            onChange={(e) => setUsername(e.target.value)}
+                        />
                 </div>
 
                 <div className="profile-section">

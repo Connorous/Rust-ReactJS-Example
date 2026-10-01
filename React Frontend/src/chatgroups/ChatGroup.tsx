@@ -1,11 +1,11 @@
 import { useState, useEffect, useContext, useRef } from 'react';
-import { AuthContext } from '../../context/AuthContext';
-import { UIContext } from '../../context/UIContext';
-import { useWSEvent } from '../../hooks/useWSEvent';
-import type { Message } from '../../types/message';
-import type { ApiResponse } from '../../types/api';
-import type { Group, GroupPermission } from '../../types/group';
-import type { User } from '../../types/user';
+import { AuthContext } from '../context/AuthContext';
+import { UIContext } from '../context/UIContext';
+import { useWSEvent } from '../hooks/useWSEvent';
+import type { Message } from '../types/message';
+import type { ApiResponse } from '../types/api';
+import type { Group, GroupPermission } from '../types/group';
+import type { User } from '../types/user';
 import GroupMessageList from './GroupMessageList';
 import GroupMessageInput from './GroupMessageInput';
 import GroupInfoPanel from './GroupInfoPanel';
@@ -23,7 +23,11 @@ function ChatGroup() {
     const [error, setError] = useState('');
     const [showInfoPanel, setShowInfoPanel] = useState(false);
 
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const messageListRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (lastSelectedGroup !== null) {
@@ -184,7 +188,11 @@ function ChatGroup() {
         }
     }
 
-    async function fetchMessages(groupId: number) {
+    async function fetchMessages(groupId: number, beforeMessageId?: number) {
+        if (!hasMore || loadingMore || messages.length === 0) {
+            return;
+        }
+
         try {
             const res = await fetch(`${API_URL}groups/messages`, {
                 method: 'POST',
@@ -192,7 +200,7 @@ function ChatGroup() {
                     Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ group_id: groupId }),
+                body: JSON.stringify({ group_id: groupId, before_message_id: beforeMessageId }),
             });
 
             const data: ApiResponse<Message[]> = await res.json();
@@ -205,6 +213,17 @@ function ChatGroup() {
         } catch (e) {
             console.log('Failed to fetch messages');
         }
+    }
+
+        async function loadMoreMessages() {
+        if (!hasMore || loadingMore || messages.length === 0) {
+            return;
+        }
+
+        setLoadingMore(true);
+
+        var oldestId = messages[0].id;
+        await fetchMessages(group!.id, oldestId);
     }
 
     async function fetchMessageSenders(groupId: number) {
@@ -269,7 +288,7 @@ function ChatGroup() {
     }
 
     // Blocked in group
-    if (groupPermission.permission_type_id === 5) {
+    if (groupPermission.permission_type_id === 7) {
         return (
             <>
                 <div className="group-page">
@@ -304,10 +323,11 @@ function ChatGroup() {
                             messages={messages}
                             sessionUser={sessionUser!}
                             groupId={group.id}
-                            getSenderUsername={getSenderUsername}
-                            canDeleteMessage={canDeleteMessage}
-                            fetchMessages={() => fetchMessages(group.id)}
                             messagesEndRef={messagesEndRef}
+                            messageListRef={messageListRef}
+                            hasMore={hasMore}
+                            loadingMore={loadingMore}
+                            onScrollTop={() => loadMoreMessages()}
                         />
 
                         {canSendMessages() ? (

@@ -12,7 +12,7 @@ import './directMessages.css';
 
 function DirectMessages() {
     const { sessionUser, accessToken, API_URL } = useContext(AuthContext);
-    const { lastSelectedDM, setLastSelectedDM, setSelectedProfileId } = useContext(UIContext);
+    const { lastSelectedDM, setLastSelectedDM, setLastSelectedProfileId } = useContext(UIContext);
     const navigate = useNavigate();
 
     const [relationship, setRelationship] = useState<Relationship | null>(null);
@@ -22,7 +22,11 @@ function DirectMessages() {
     const [otherUserId, setOtherUserId] = useState<number | null>(null);
     const [otherUsername, setOtherUsername] = useState<string>('');
 
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const messageListRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (lastSelectedDM !== null) {
@@ -37,7 +41,7 @@ function DirectMessages() {
     // WS events
     useWSEvent('message_created', (data: any) => {
         if (data.relationship_id === relationship?.id) {
-            getMessages(relationship!.id);
+            setMessages(prev => [...prev, data]);
         }
     });
 
@@ -119,27 +123,53 @@ function DirectMessages() {
         }
     }
 
-    async function getMessages(relationshipId: number) {
+    async function getMessages(relationshipId: number, beforeMessageId?: number) {
         try {
-            const res = await fetch(`${API_URL}direct-messages/messages`, {
+            const res = await fetch(`${API_URL}direct-messages/list`, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ relationship_id: relationshipId }),
+                body: JSON.stringify({ relationship_id: relationshipId, before_message_id: beforeMessageId ?? null }),
             });
 
             const data: ApiResponse<Message[]> = await res.json();
 
             if (data.success === true) {
-                setMessages(data.data!);
+                if (beforeMessageId) {
+                    const list = messageListRef.current;
+                    const scrollHeightBefore = list?.scrollHeight ?? 0;
+
+                    setMessages(prev => [...data.data!, ...prev]);
+
+                    requestAnimationFrame(() => { if (list) { list.scrollTop = list.scrollHeight - scrollHeightBefore;}});
+
+                    if (data.data!.length < 100) {
+                        setHasMore(false);
+                    }
+                }
+                else {
+                    setMessages(data.data!);
+                    setHasMore(data.data!.length === 100);
+                }
             } else if (data.empty === true) {
                 setMessages([]);
             }
         } catch (e) {
             console.log('Failed to fetch messages');
         }
+    }
+
+    async function loadMoreMessages() {
+        if (!hasMore || loadingMore || messages.length === 0) {
+            return;
+        }
+
+        setLoadingMore(true);
+
+        var oldestId = messages[0].id;
+        await getMessages(relationship!.id, oldestId);
     }
 
     function canReadMessages(rel: Relationship): boolean {
@@ -159,7 +189,7 @@ function DirectMessages() {
 
     function handleUsernameClick() {
         if (otherUserId !== null) {
-            setSelectedProfileId(otherUserId);
+            setLastSelectedProfileId(otherUserId);
             navigate('/profile');
         }
     }
@@ -250,6 +280,10 @@ function DirectMessages() {
                     relationshipId={relationship.id}
                     getMessages={() => getMessages(relationship.id)}
                     messagesEndRef={messagesEndRef}
+                    messageListRef={messageListRef}
+                    hasMore={hasMore}
+                    loadingMore={loadingMore}
+                    onScrollTop={() => loadMoreMessages()}
                 />
 
                 {canSendMessages(relationship) ? (

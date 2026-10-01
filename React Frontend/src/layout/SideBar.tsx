@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import FriendsList from '../relationships/FriendsList';
 import RequestsList from '../relationships/RequestsList';
-import DMList from '../directMessages/DMList';
-import GroupList from '../chatGroups/GroupList';
+import DMList from '../directmessages/DMList';
+import GroupList from '../chatgroups/GroupList';
 import UserList from '../users/UserList';
 import { UIContext } from '../context/UIContext';
 
 function Sidebar() {
     const { sessionUser, isDesktop } = useContext(AuthContext);
-    const { setSelectedProfileId } = useContext(UIContext);
+    const { setLastSelectedProfileId } = useContext(UIContext);
 
     const navigate = useNavigate();
 
@@ -28,7 +28,7 @@ function Sidebar() {
 
     function handleNavClick(nav: number, route: string) {
         if (nav === 1) {
-            setSelectedProfileId(sessionUser?.id ?? null);
+            setLastSelectedProfileId(sessionUser?.id ?? null);
         }
         setActiveNav(nav);
         navigate(route);

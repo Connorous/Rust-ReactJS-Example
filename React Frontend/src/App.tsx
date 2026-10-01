@@ -54,7 +54,7 @@ function App() {
 
     const [userStatuses, setUserStatuses] = useState<UserStatus[]>(() => {
         try {
-            return JSON.parse(localStorage.getItem('userTypes') ?? '[]');
+            return JSON.parse(localStorage.getItem('userStatuses') ?? '[]');
         } catch {
             return [];
         }
@@ -101,22 +101,22 @@ function App() {
     }, [themes]);
     useEffect(() => {
         localStorage.setItem('userTypes', JSON.stringify(userTypes));
-    }, [themes]);
+    }, [userTypes]);
     useEffect(() => {
         localStorage.setItem('userStatuses', JSON.stringify(userStatuses));
-    }, [themes]);
+    }, [userStatuses]);
     useEffect(() => {
         localStorage.setItem('showNameChoices', JSON.stringify(showNameChoices));
-    }, [themes]);
+    }, [showNameChoices]);
     useEffect(() => {
         localStorage.setItem('accountStatuses', JSON.stringify(accountStatuses));
-    }, [themes]);
+    }, [accountStatuses]);
     useEffect(() => {
         localStorage.setItem('relationshipStatuses', JSON.stringify(relationshipStatuses));
-    }, [themes]);
+    }, [relationshipStatuses]);
     useEffect(() => {
         localStorage.setItem('groupPermissionTypes', JSON.stringify(groupPermissionTypes));
-    }, [themes]);
+    }, [groupPermissionTypes]);
 
     // --- TOKEN REFRESH ---
     const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -268,15 +268,15 @@ function App() {
                     return;
                 }
 
-                if (eventName === 'user_update' && data.user_id === sessionUser?.id) {
-                    if (data.user_type === 5 || data.account_status === 1) {
+                if (eventName === 'user_updated' && data.user_id === sessionUser?.id) {
+                    if (data.user_type === 5 || data.account_status !== 1) {
                         logout();
                         return;
                     }
                     setSessionUser((prev: User | null) => prev ? {
                         ...prev,
-                        user_type_id: data.user_type,
-                        account_status: data.account_status,
+                        user_type_id: data.user_type_id,
+                        account_status: data.account_status_id,
                         is_online: data.is_online,
                         status_id: data.status_id,
                         } : null);
@@ -334,6 +334,7 @@ function App() {
                 groupPermissionTypes,
                 setGroupPermissionTypes,
                 clearRefreshTimeout,
+                logout,
                 API_URL,
                 SECRET,
                 isDesktop,
