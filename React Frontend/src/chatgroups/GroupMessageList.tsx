@@ -9,6 +9,8 @@ interface GroupMessageListProps {
     groupId: number;
     sessionUser: User;
     fetchMessages: () => void;
+    getSenderUsername: (senderId: number) => string;
+    canDeleteMessage: (senderId: number) => boolean;
     messagesEndRef: React.RefObject<HTMLDivElement| null>;
     messageListRef: React.RefObject<HTMLDivElement| null>;
     hasMore: boolean;
@@ -21,6 +23,8 @@ function GroupMessageList({
     groupId,
     sessionUser,
     fetchMessages,
+    getSenderUsername,
+    canDeleteMessage,
     messagesEndRef, 
     messageListRef,
     hasMore, 
@@ -59,6 +63,8 @@ function GroupMessageList({
                         sessionUser={sessionUser}
                         groupId={groupId}
                         fetchMessages={fetchMessages}
+                        senderUsername={getSenderUsername(message.sender_id)}
+                        canDelete={canDeleteMessage(message.sender_id)}
                     />
                 ))}
                 <div ref={messagesEndRef} />

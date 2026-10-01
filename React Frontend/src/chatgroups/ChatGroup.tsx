@@ -224,6 +224,7 @@ function ChatGroup() {
 
         var oldestId = messages[0].id;
         await fetchMessages(group!.id, oldestId);
+        setLoadingMore(false);
     }
 
     async function fetchMessageSenders(groupId: number) {
@@ -323,6 +324,8 @@ function ChatGroup() {
                             messages={messages}
                             sessionUser={sessionUser!}
                             groupId={group.id}
+                            getSenderUsername={getSenderUsername}
+                            canDeleteMessage={canDeleteMessage}
                             messagesEndRef={messagesEndRef}
                             messageListRef={messageListRef}
                             hasMore={hasMore}
