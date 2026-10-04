@@ -7,7 +7,7 @@ import Mobile from "./components/mobile/Mobile";
 
 //import { MobilePage } from "./components/desktop/main/
 // Mainpage"; //not setup yet
-//comment
+
 function App() {
   var [APIAdress, setAPIAdress] = useState(() => {
     try {
