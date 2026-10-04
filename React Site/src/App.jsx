@@ -1,13 +1,13 @@
-import { useMediaQuery } from 'react-responsive';
-import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
-import Desktop from './components/desktop/Desktop';
-import Mobile from './components/mobile/Mobile';
+import { useMediaQuery } from "react-responsive";
+import { useState, useEffect } from "react";
+import { Navigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
+import Desktop from "./components/desktop/Desktop";
+import Mobile from "./components/mobile/Mobile";
 
 //import { MobilePage } from "./components/desktop/main/
 // Mainpage"; //not setup yet
-
+//comment
 function App() {
   var [APIAdress, setAPIAdress] = useState(() => {
     try {
@@ -19,26 +19,26 @@ function App() {
 
   var [jwtToken, setJwtToken] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('jwtToken'));
+      return JSON.parse(localStorage.getItem("jwtToken"));
     } catch {
       return null;
     }
   });
 
   useEffect(() => {
-    localStorage.setItem('jwtToken', JSON.stringify(jwtToken));
+    localStorage.setItem("jwtToken", JSON.stringify(jwtToken));
   }, [jwtToken]);
 
   var [sessionUser, setSessionUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('sessionUser'));
+      return JSON.parse(localStorage.getItem("sessionUser"));
     } catch {
       return null;
     }
   });
 
   useEffect(() => {
-    localStorage.setItem('sessionUser', JSON.stringify(sessionUser));
+    localStorage.setItem("sessionUser", JSON.stringify(sessionUser));
   }, [sessionUser]);
 
   const isTokenExpired = (token) => {
@@ -57,7 +57,7 @@ function App() {
   useEffect(() => {
     if (jwtToken != null) {
       if (isTokenExpired(jwtToken)) {
-        window.location.replace('/logout');
+        window.location.replace("/logout");
         return;
       }
 
@@ -66,11 +66,11 @@ function App() {
       const msUntilExpiry = decoded.exp * 1000 - Date.now();
 
       const logoutTimeout = setTimeout(() => {
-        window.location.replace('/logout');
+        window.location.replace("/logout");
       }, msUntilExpiry);
     } else {
-      if (window.location.pathname != '/login') {
-        window.location.replace('/login');
+      if (window.location.pathname != "/login") {
+        window.location.replace("/login");
       }
     }
   }, [jwtToken]);
