@@ -100,6 +100,12 @@ pub struct ListGroupPermissionsRequestBody {
 }
 
 #[derive(Deserialize, Clone)]
+pub struct GetGroupPermissionRequestBody {
+    pub group_id: i64,
+    pub user_id: i64,
+}
+
+#[derive(Deserialize, Clone)]
 pub struct AddGroupPermissionRequestBody {
     pub group_id: i64,
     pub user_id: i64,
@@ -557,6 +563,26 @@ pub async fn list_group_permissions(
 
     result
 }*/
+
+pub async fn get_group_permission(
+    data: web::Data<AppState>,
+    claims: RequireGroup<
+        { user_type::VIEWER },
+        { group_permission::VIEWER },
+        { errors::ADD_GROUP_MEMBER },
+    >,
+    json: web::Json<GetGroupPermissionRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match chat_group_controller::get_group_permission(data, claims.0, body.group_id).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
 
 pub async fn add_group_permission(
     data: web::Data<AppState>,

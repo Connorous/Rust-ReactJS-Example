@@ -1,14 +1,14 @@
-import type { GroupPermission, GroupMember } from '../types/group';
+import type { GroupPermissionRow, GroupMember } from '../types/group';
 import type { User } from '../types/user';
 import GroupMemberViewHolder from './GroupMemberViewHolder';
 import './chatGroups.css';
 
 interface GroupMemberListProps {
     members: GroupMember[];
-    permissions: GroupPermission[];
+    permissions: GroupPermissionRow[];
     groupId: number;
     sessionUser: User;
-    groupPermission: GroupPermission;
+    groupPermission: GroupPermissionRow;
     onMembersUpdated: () => void;
 }
 
@@ -31,17 +31,28 @@ function GroupMemberList({
     return (
         <>
             <div className="group-member-list">
-                {members.map(member => (
-                    <GroupMemberViewHolder
-                        key={member.id}
-                        member={member}
-                        permissions={permissions}
-                        groupId={groupId}
-                        sessionUser={sessionUser}
-                        groupPermission={groupPermission}
-                        onMembersUpdated={onMembersUpdated}
-                    />
-                ))}
+                {members.map(member => {
+                    var memberPermission: GroupPermissionRow | null = null;
+
+                    for (var i = 0; i < permissions.length; i++) {
+                        if (permissions[i].user_id === member.id) {
+                            memberPermission = permissions[i];
+                            break;
+                        }
+                    }
+
+                    return (
+                        <GroupMemberViewHolder
+                            key={member.id}
+                            member={member}
+                            permission={memberPermission}
+                            groupId={groupId}
+                            sessionUser={sessionUser}
+                            groupPermission={groupPermission}
+                            onMembersUpdated={onMembersUpdated}
+                        />
+                    );
+                })}
             </div>
         </>
     );

@@ -1,11 +1,10 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import FriendsList from '../relationships/FriendsList';
-import RequestsList from '../relationships/RequestsList';
-import DMList from '../directmessages/DMList';
-import GroupList from '../chatgroups/GroupList';
-import UserList from '../users/UserList';
+import FriendsList from './FriendsList';
+import RequestsList from './RequestsList';
+import DirectMessagesList from './DirectMessagesList';
+import GroupList from './GroupsList';
 import { UIContext } from '../context/UIContext';
 
 function Sidebar() {
@@ -148,7 +147,7 @@ function Sidebar() {
                     )}
                     {activeNav === 5 ? (
                         <>
-                            <DMList />
+                            <DirectMessagesList />
                         </>
                     ) : (
                         <></>
@@ -156,13 +155,6 @@ function Sidebar() {
                     {activeNav === 6 ? (
                         <>
                             <GroupList />
-                        </>
-                    ) : (
-                        <></>
-                    )}
-                    {activeNav === 7 ? (
-                        <>
-                            <UserList />
                         </>
                     ) : (
                         <></>

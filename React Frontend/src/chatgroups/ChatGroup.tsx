@@ -4,7 +4,7 @@ import { UIContext } from '../context/UIContext';
 import { useWSEvent } from '../hooks/useWSEvent';
 import type { Message } from '../types/message';
 import type { ApiResponse } from '../types/api';
-import type { Group, GroupPermission } from '../types/group';
+import type { Group, GroupPermissionRow } from '../types/group';
 import type { User } from '../types/user';
 import GroupMessageList from './GroupMessageList';
 import GroupMessageInput from './GroupMessageInput';
@@ -12,11 +12,11 @@ import GroupInfoPanel from './GroupInfoPanel';
 import './chatGroups.css';
 
 function ChatGroup() {
-    const { sessionUser, accessToken, API_URL, isDesktop } = useContext(AuthContext);
+    const { sessionUser, accessToken, API_URL } = useContext(AuthContext);
     const { lastSelectedGroup } = useContext(UIContext);
 
     const [group, setGroup] = useState<Group | null>(null);
-    const [groupPermission, setGroupPermission] = useState<GroupPermission | null>(null);
+    const [groupPermission, setGroupPermission] = useState<GroupPermissionRow | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [senders, setSenders] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
@@ -78,6 +78,28 @@ function ChatGroup() {
 
     function scrollToBottom() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function scrollToMessage(messageId: number) {
+        var found: boolean = false;
+
+        for (var i = 0; i < messages.length; i++) {
+            if (messages[i].id === messageId) {
+                found = true;
+                break;
+            }
+        }
+
+        if (found) {
+            const element = document.getElementById(`message-${messageId}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.classList.add('message-highlight');
+                setTimeout(() => element.classList.remove('message-highlight'), 2000);
+            }
+        } else {
+            fetchAroundMessage(messageId);
+        }
     }
 
     function senderInList(senderId: number): boolean {
@@ -169,10 +191,10 @@ function ChatGroup() {
                 body: JSON.stringify({ group_id: groupId }),
             });
 
-            const data: ApiResponse<GroupPermission[]> = await res.json();
+            const data: ApiResponse<GroupPermissionRow[]> = await res.json();
 
             if (data.success === true) {
-                var userPermission: GroupPermission | null = null;
+                var userPermission: GroupPermissionRow | null = null;
 
                 for (var i = 0; i < data.data!.length; i++) {
                     if (data.data![i].user_id === sessionUser?.id) {
@@ -189,9 +211,6 @@ function ChatGroup() {
     }
 
     async function fetchMessages(groupId: number, beforeMessageId?: number) {
-        if (!hasMore || loadingMore || messages.length === 0) {
-            return;
-        }
 
         try {
             const res = await fetch(`${API_URL}groups/messages`, {
@@ -204,9 +223,24 @@ function ChatGroup() {
             });
 
             const data: ApiResponse<Message[]> = await res.json();
-
+ 
             if (data.success === true) {
-                setMessages(data.data!);
+                if (beforeMessageId) {
+                    const list = messageListRef.current;
+                    const scrollHeightBefore = list?.scrollHeight ?? 0;
+
+                    setMessages(prev => [...data.data!, ...prev]);
+
+                    requestAnimationFrame(() => { if (list) { list.scrollTop = list.scrollHeight - scrollHeightBefore;}});
+
+                    if (data.data!.length < 100) {
+                        setHasMore(false);
+                    }
+                }
+                else {
+                    setMessages(data.data!);
+                    setHasMore(data.data!.length === 100);
+                }
             } else if (data.empty === true) {
                 setMessages([]);
             }
@@ -225,6 +259,40 @@ function ChatGroup() {
         var oldestId = messages[0].id;
         await fetchMessages(group!.id, oldestId);
         setLoadingMore(false);
+    }
+
+    async function fetchAroundMessage(messageId: number) {
+        try {
+            const res = await fetch(`${API_URL}groups/list-around-message`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rgroup_id: group!.id,
+                    message_id: messageId,
+                }),
+            });
+
+            const data: ApiResponse<Message[]> = await res.json();
+
+            if (data.success === true) {
+                setMessages(data.data!);
+                setHasMore(data.data![0].id > 1);
+
+                requestAnimationFrame(() => {
+                    const element = document.getElementById(`message-${messageId}`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        element.classList.add('message-highlight');
+                        setTimeout(() => element.classList.remove('message-highlight'), 2000);
+                    }
+                });
+            }
+        } catch (e) {
+            console.log('Failed to fetch around message');
+        }
     }
 
     async function fetchMessageSenders(groupId: number) {
@@ -324,6 +392,7 @@ function ChatGroup() {
                             messages={messages}
                             sessionUser={sessionUser!}
                             groupId={group.id}
+                            fetchMessages={() => fetchMessages}
                             getSenderUsername={getSenderUsername}
                             canDeleteMessage={canDeleteMessage}
                             messagesEndRef={messagesEndRef}
@@ -357,6 +426,7 @@ function ChatGroup() {
                                 sessionUser={sessionUser!}
                                 onGroupUpdated={() => fetchGroup(group.id)}
                                 onClose={() => setShowInfoPanel(false)}
+                                scrollToMessage={() => scrollToMessage}
                             />
                         </>
                     ) : (

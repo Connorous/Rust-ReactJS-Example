@@ -1,7 +1,9 @@
 use crate::state::AppState;
 use crate::{auth::JwtClaims, extractors::user_type};
 use actix_web::{web, HttpResponse};
+use chrono::DateTime;
 use serde::Serialize;
+use crate::encryption::decrypt_message;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct RelationshipRow {
@@ -11,6 +13,42 @@ struct RelationshipRow {
     status_id: i64,
     blocked_by: Option<i64>,
     declined_by: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct RelationshipListRow {
+    id: i64,
+    requester_id: i64,
+    receiver_id: i64,
+    status_id: i64,
+    blocked_by: Option<i64>,
+    declined_by: Option<i64>,
+    requester_username: String,
+    receiver_username: String,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct MessageRow {
+    id: i64,
+    relationship_id: Option<i64>,
+    message: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct MessagesRelationshipListRow {
+    id: i64,
+    requester_id: i64,
+    receiver_id: i64,
+    status_id: i64,
+    blocked_by: Option<i64>,
+    declined_by: Option<i64>,
+    requester_username: String,
+    receiver_username: String,
+    last_message: Option<String>,
+    last_message_at: Option<chrono::DateTime<chrono::Utc>,>,
+    last_message_updated_at: Option<chrono::DateTime<chrono::Utc>,>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -46,10 +84,117 @@ pub async fn list_relationships(
     let pool = data.db.to_owned();
 
     let relationships = sqlx::query_as!(
-        RelationshipRow,
-        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
-         FROM user_relationships
-         WHERE requester_id = $1 OR receiver_id = $1
+        RelationshipListRow,
+        "SELECT ur.id, ur.requester_id, ur.receiver_id, ur.status_id, ur.blocked_by, ur.declined_by,
+        ru.username as requester_username, rv.username as receiver_username
+         FROM user_relationships ur
+        JOIN users ru ON ru.id = ur.requester_id
+        JOIN users rv ON ru.id = ur.receiver_id
+         WHERE (ur.requester_id = $1 OR ur.receiver_id = $1) AND (ur.status_id > 1 AND ur.status_id < 4)
+         ORDER BY id",
+        claims.user_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    if (relationships.is_empty()) {
+        let response = ResponseEmptyList {
+            msg: String::from("No Relationships Found"),
+            empty: true,
+            success: false,
+        };
+
+        Ok(HttpResponse::BadRequest().json(response))
+    } else {
+        let mut ids: Vec<i64> = Vec::new();
+
+        let relationships_clone = relationships.clone();
+
+        for relationship in relationships {
+            ids.push(relationship.id)
+        }
+
+
+        let mut recent_messages = sqlx::query_as!(MessageRow, "SELECT id, message, created_at, updated_at, relationship_id FROM messages WHERE relationship_id = ANY($1) ORDER BY relationship_id", &ids[..]).fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+
+        let mut result: Vec<MessagesRelationshipListRow> = Vec::new();
+    
+        for relationship in relationships_clone {
+            let mut last_message: Option<String> = None;
+            let mut last_message_at: Option<chrono::DateTime<chrono::Utc>,> = None;
+            let mut last_message_updated_at: Option<chrono::DateTime<chrono::Utc>,> = None;
+
+            let recent_messages_clone = recent_messages.clone();
+
+            for mut message in recent_messages_clone {
+
+                let message_id: Option<i64> = message.relationship_id;
+                match message_id {
+                    None => {}
+                    Some(_message_id) => {
+                        if (relationship.id == _message_id) {
+                    let mut decrypted_message = match decrypt_message(&message.message) {
+                            Ok(decypted_text) => decypted_text,
+                            Err(_err) => {
+                                let response = Response {
+                                    msg: String::from("Messages Could Not be Decrypted"),
+                                    success: false,
+                                };
+
+                                return Ok(HttpResponse::BadRequest().json(response));
+                            }
+                        };
+
+                        last_message = Some(decrypted_message);
+                        last_message_at = Some(message.created_at);
+                        last_message_updated_at = Some(message.updated_at);
+                }
+                    }
+                }       
+        }
+            result.push(MessagesRelationshipListRow {
+                id: relationship.id,
+                requester_id: relationship.requester_id,
+                receiver_id: relationship.receiver_id,
+                status_id: relationship.status_id,
+                blocked_by: relationship.blocked_by,
+                declined_by: relationship.declined_by,
+                requester_username: relationship.requester_username,
+                receiver_username: relationship.receiver_username,
+                last_message: last_message,
+                last_message_at: last_message_at,
+                last_message_updated_at: last_message_updated_at
+            })
+        }
+
+        let response = DataResponse {
+            msg: String::from("Success"),
+            data: result,
+            success: true,
+        };
+
+        Ok(HttpResponse::Ok().json(response))
+    }
+}
+
+pub async fn list_pending_relationships(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let relationships = sqlx::query_as!(
+        RelationshipListRow,
+        "SELECT ur.id, ur.requester_id, ur.receiver_id, ur.status_id, ur.blocked_by, ur.declined_by,
+        ru.username as requester_username, rv.username as receiver_username
+         FROM user_relationships ur
+        JOIN users ru ON ru.id = ur.requester_id
+        JOIN users rv ON ru.id = ur.receiver_id
+         WHERE (ur.requester_id = $1 OR ur.receiver_id = $1) AND ur.status_id = 1
          ORDER BY id",
         claims.user_id
     )
@@ -103,19 +248,24 @@ pub async fn search_relationships(
     let pool = data.db.to_owned();
 
     let relationships = sqlx::query_as!(
-        RelationshipRow,
-        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
-         FROM user_relationships
-         WHERE (requester_id = $1 OR receiver_id = $1) 
-		 AND ((requester_id IN (SELECT id FROM users WHERE username LIKE $2))  
-		 OR (receiver_id IN (SELECT id FROM users WHERE username LIKE $2)))  
+        RelationshipListRow,
+        "SELECT ur.id, ur.requester_id, ur.receiver_id, ur.status_id, ur.blocked_by, ur.declined_by,
+        ru.username as requester_username, rv.username as receiver_username
+         FROM user_relationships ur
+        JOIN users ru ON ru.id = ur.requester_id
+        JOIN users rv ON ru.id = ur.receiver_id
+         WHERE (ur.requester_id = $1 OR ur.receiver_id = $1) 
+         AND ((ur.requester_id IN (SELECT id FROM users WHERE username LIKE $2))  
+		 OR (ur.receiver_id IN (SELECT id FROM users WHERE username LIKE $2))) 
+        AND (ur.status_id > 1 AND ur.status_id < 4)
          ORDER BY id",
         claims.user_id,
-        search_string,
+        search_string
     )
     .fetch_all(&pool)
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
 
     if (relationships.is_empty()) {
         let response = ResponseEmptyList {
@@ -126,13 +276,136 @@ pub async fn search_relationships(
 
         Ok(HttpResponse::BadRequest().json(response))
     } else {
+
+        let mut ids: Vec<i64> = Vec::new();
+
+        let relationships_clone = relationships.clone();
+
+        for relationship in relationships {
+            ids.push(relationship.id)
+        }
+
+
+        let mut recent_messages = sqlx::query_as!(MessageRow, "SELECT id, message, created_at, updated_at, relationship_id FROM messages WHERE relationship_id = ANY($1) ORDER BY relationship_id", &ids[..]).fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+
+        let mut result: Vec<MessagesRelationshipListRow> = Vec::new();
+    
+        for relationship in relationships_clone {
+            let mut last_message: Option<String> = None;
+            let mut last_message_at: Option<chrono::DateTime<chrono::Utc>,> = None;
+            let mut last_message_updated_at: Option<chrono::DateTime<chrono::Utc>,> = None;
+
+            let recent_messages_clone = recent_messages.clone();
+
+            for mut message in recent_messages_clone {
+
+                let message_id: Option<i64> = message.relationship_id;
+                match message_id {
+                    None => {}
+                    Some(_message_id) => {
+                        if (relationship.id == _message_id) {
+                    let mut decrypted_message = match decrypt_message(&message.message) {
+                            Ok(decypted_text) => decypted_text,
+                            Err(_err) => {
+                                let response = Response {
+                                    msg: String::from("Messages Could Not be Decrypted"),
+                                    success: false,
+                                };
+
+                                return Ok(HttpResponse::BadRequest().json(response));
+                            }
+                        };
+
+                        last_message = Some(decrypted_message);
+                        last_message_at = Some(message.created_at);
+                        last_message_updated_at = Some(message.updated_at);
+                }
+                    }
+                }       
+        }
+            result.push(MessagesRelationshipListRow {
+                id: relationship.id,
+                requester_id: relationship.requester_id,
+                receiver_id: relationship.receiver_id,
+                status_id: relationship.status_id,
+                blocked_by: relationship.blocked_by,
+                declined_by: relationship.declined_by,
+                requester_username: relationship.requester_username,
+                receiver_username: relationship.receiver_username,
+                last_message: last_message,
+                last_message_at: last_message_at,
+                last_message_updated_at: last_message_updated_at
+            })
+        }
+
+
+
         let response = DataResponse {
             msg: String::from("Success"),
-            data: relationships,
+            data: result,
             success: true,
         };
 
         Ok(HttpResponse::Ok().json(response))
+    }
+}
+
+pub async fn search_non_relationships(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    search_value: String,
+) -> Result<HttpResponse, actix_web::Error> {
+    if (search_value.is_empty()) {
+        let response = Response {
+            msg: String::from("Must Provide a Username to Search for a Relationships"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    } else if (search_value.len() < 3) {
+        let response = Response {
+            msg: String::from("Provided Search for Username must be 3 or More Characters"),
+            success: false,
+        };
+
+        return Ok(HttpResponse::BadRequest().json(response));
+    }
+
+
+    let search_string = format!("%{}%", search_value);
+
+    let pool = data.db.to_owned();
+
+    let users = sqlx::query_as!(
+      UserRow,
+        "SELECT id, username FROM users WHERE username LIKE $2 AND (id IN (SELECT requester_id FROM user_relationships WHERE requester_id != $1) OR id IN (SELECT receiver_id FROM user_relationships WHERE requester_id != $1)) AND id != $1",
+        claims.user_id,
+        search_string
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+     if (users.is_empty()) {
+         let response = ResponseEmptyList {
+                msg: String::from("No Users in Relationships With Found"),
+                empty: true,
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+    }
+    else {
+        let response = DataResponse {
+                msg: String::from("Success"),
+                data: users,
+                success: true,
+            };
+
+            Ok(HttpResponse::Ok().json(response))
     }
 }
 
@@ -412,11 +685,15 @@ pub async fn get_relationship(
 ) -> Result<HttpResponse, actix_web::Error> {
     let pool = data.db.to_owned();
 
-    let existing_relationship = sqlx::query_as!(
-        RelationshipRow,
-        "SELECT id, requester_id, receiver_id, status_id, blocked_by, declined_by
-         FROM user_relationships
-         WHERE (requester_id = $1 AND receiver_id  = $2) OR (requester_id = $2 AND receiver_id = $1)
+
+       let existing_relationship = sqlx::query_as!(
+        RelationshipListRow,
+        "SELECT ur.id, ur.requester_id, ur.receiver_id, ur.status_id, ur.blocked_by, ur.declined_by,
+        ru.username as requester_username, rv.username as receiver_username
+         FROM user_relationships ur
+        JOIN users ru ON ru.id = ur.requester_id
+        JOIN users rv ON ru.id = ur.receiver_id
+         WHERE ((ur.requester_id = $1 AND ur.receiver_id = $2) AND (ur.requester_id = $2 OR ur.receiver_id = $1)) AND (ur.status_id > 1 AND ur.status_id < 4)
          ORDER BY id",
         claims.user_id,
         user_id

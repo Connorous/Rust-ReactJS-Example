@@ -47,8 +47,24 @@ pub fn configure_relationship_routes(cfg: &mut web::ServiceConfig) {
                 web::get().to(relationship_routes::list_relationships),
             )
             .route(
-                "/search",
+                "/list-pending",
+                web::get().to(relationship_routes::list_pending_relationships),
+            )
+            .route(
+                "/search-relationships",
                 web::post().to(relationship_routes::search_relationships),
+            )
+            .route(
+                "/search-non-relationships",
+                web::post().to(relationship_routes::search_non_relationships),
+            )
+            .route(
+                "/list-relationship-users",
+                web::post().to(relationship_routes::list_users_in_relationship_with),
+            )
+            .route(
+                "/list-non-relationship-users",
+                web::post().to(relationship_routes::list_users_not_in_relationship_with),
             )
             .route(
                 "/get/relationship",
@@ -192,6 +208,10 @@ pub fn configure_chat_group_routes(cfg: &mut web::ServiceConfig) {
             .route(
                 "/permissions",
                 web::post().to(chat_group_routes::list_group_permissions),
+            )
+            .route(
+                "/permission/get",
+                web::post().to(chat_group_routes::get_group_permission),
             )
             .route(
                 "/permission/new",

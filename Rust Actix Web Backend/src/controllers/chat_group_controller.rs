@@ -1,6 +1,6 @@
 use crate::auth::JwtClaims;
 use crate::encryption::{decrypt_message, encrypt_message};
-use crate::extractors::{errors, group_permission, permission_error_message, user_type};
+use crate::extractors::{group_permission, user_type};
 use crate::state::AppState;
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
@@ -37,13 +37,23 @@ struct GroupPermissionRow {
     group_id: i64,
     user_id: i64,
     permission_type_id: i64,
+    updated_by: i64,
+    updated_by_username: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct GroupPermission {
+    id: i64,
+    permission_type_id: i64,
+}
+
+/*#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 struct PermissionTypeRow {
     id: i64,
     permission_type: String,
-}
+}*/
 
 #[derive(Debug, Clone, Serialize)]
 struct Response {
@@ -1258,10 +1268,12 @@ pub async fn list_group_permissions(
         Some(_group) => {
             let permissions = sqlx::query_as!(
                 GroupPermissionRow,
-                "SELECT id, group_id, user_id, permission_type_id
-         FROM chat_group_permissions
-         WHERE group_id = $1
-         ORDER BY id",
+                "SELECT gp.id, gp.group_id, gp.user_id, gp.permission_type_id,
+                    gp.updated_by, gp.created_at, gp.updated_at,
+                    u.username as updated_by_username
+                    FROM chat_group_permissions gp
+                    JOIN users u ON u.id = gp.updated_by
+                    WHERE gp.group_id = $1",
                 group_id
             )
             .fetch_all(&pool)
@@ -1323,6 +1335,61 @@ pub async fn list_group_permissions(
     }
 }*/
 
+pub async fn get_group_permission(
+    data: web::Data<AppState>,
+    claims: JwtClaims,
+    group_id: i64,
+) -> Result<HttpResponse, actix_web::Error> {
+    let pool = data.db.to_owned();
+
+    let existing_group = sqlx::query!("SELECT id FROM chat_groups WHERE id = $1", group_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    match existing_group {
+        None => {
+            let response = Response {
+                msg: String::from("Group Not Found"),
+                success: false,
+            };
+
+            Ok(HttpResponse::BadRequest().json(response))
+        }
+        Some(_existing_group) => {
+            let existing_permission = sqlx::query_as!(
+                GroupPermission,
+                "SELECT id, permission_type_id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
+                group_id,
+                claims.user_id
+            )
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+            match existing_permission {
+                Some(_existing_permission) => {
+                    let response = DataResponse {
+                        msg: String::from("User is Already a Member of this Group"),
+                        data: _existing_permission,
+                        success: true,
+                    };
+
+                    Ok(HttpResponse::Ok().json(response))
+                }
+                None => {
+                    let response = Response {
+                        msg: String::from("You are not a Member of this Group"),
+                        success: false,
+                    };
+
+                    Ok(HttpResponse::BadRequest().json(response))
+                }
+            }
+        }
+    }
+}
+
 pub async fn add_group_permission(
     data: web::Data<AppState>,
     claims: JwtClaims,
@@ -1347,7 +1414,7 @@ pub async fn add_group_permission(
             Ok(HttpResponse::BadRequest().json(response))
         }
         Some(_existing_group) => {
-            let existing_group = sqlx::query!(
+            let existing_permission = sqlx::query!(
                 "SELECT id FROM chat_group_permissions WHERE group_id = $1 AND user_id = $2",
                 group_id,
                 user_id
@@ -1356,8 +1423,8 @@ pub async fn add_group_permission(
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-            match existing_group {
-                Some(_existing_group) => {
+            match existing_permission {
+                Some(_existing_permission) => {
                     let response = Response {
                         msg: String::from("User is Already a Member of this Group"),
                         success: false,
@@ -1482,7 +1549,7 @@ pub async fn group_request(
                         return Ok(HttpResponse::BadRequest().json(response));
                     }
                     None => {
-                        let result = sqlx::query!("INSERT INTO chat_group_permissions (group_id, user_id, permission_type_id) VALUES ($1, $2, $3)", group_id, claims.user_id, 5i64).execute(&pool).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+                        let result = sqlx::query!("INSERT INTO chat_group_permissions (group_id, user_id, permission_type_id, updated_by) VALUES ($1, $2, $3, $2)", group_id, claims.user_id, 5i64).execute(&pool).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
                         if (result.rows_affected() > 0) {
                             let response = Response {

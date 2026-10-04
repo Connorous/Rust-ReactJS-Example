@@ -60,6 +60,19 @@ pub async fn list_relationships(
     result
 }
 
+pub async fn list_pending_relationships(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
+) -> HttpResponse {
+    let result: HttpResponse =
+        match relationship_controller::list_pending_relationships(data, claims.0).await {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
+
+    result
+}
+
 pub async fn search_relationships(
     data: web::Data<AppState>,
     claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
@@ -77,6 +90,24 @@ pub async fn search_relationships(
         Ok(res) => res,
         Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
     };
+
+    result
+}
+
+pub async fn search_non_relationships(
+    data: web::Data<AppState>,
+    claims: RequireUserType<{ user_type::VIEWER }, { errors::LIST_RELATIONSHIPS }>,
+    json: web::Json<SearchRelationshipRequestBody>,
+) -> HttpResponse {
+    let body = json.clone();
+
+    let result: HttpResponse =
+        match relationship_controller::search_non_relationships(data, claims.0, body.search_value)
+            .await
+        {
+            Ok(res) => res,
+            Err(e) => HttpResponse::BadRequest().body(format!("Server Error : {}", e)),
+        };
 
     result
 }

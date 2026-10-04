@@ -55,11 +55,48 @@ struct UserManageRow {
     username: String,
     name: String,
     email: String,
+    user_type_id: i64,
+    account_status_id: i64,
+    status_id: i64,
+    is_online: bool,
+    created_by_username: Option<String>,
+    updated_by_username: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+struct UserInfo {
+    id: i64,
+    username: String,
+    name: String,
+    email: String,
     bio_info: Option<String>,
     user_type_id: i64,
     account_status_id: i64,
     status_id: Option<i64>,
     is_online: bool,
+    show_name_choice_id: i64,
+    theme_id: i64,
+    theme_dark_mode: bool,
+    light_theme_primary_colour: String,
+    light_theme_secondary_colour: String,
+    light_theme_accent_colour: String,
+    light_theme_sent_colour: String,
+    light_theme_received_colour: String,
+    light_theme_dark_text_colour: String,
+    light_theme_light_text_colour: String,
+    dark_theme_primary_colour: String,
+    dark_theme_secondary_colour: String,
+    dark_theme_accent_colour: String,
+    dark_theme_sent_colour: String,
+    dark_theme_received_colour: String,
+    dark_theme_dark_text_colour: String,
+    dark_theme_light_text_colour: String,
+    created_by_username: Option<String>,
+    updated_by_username: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -99,7 +136,10 @@ pub async fn list_users(
 
     let users = sqlx::query_as!(
         UserManageRow,
-        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id, status_id, is_online FROM users WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1) ORDER BY id LIMIT $2 OFFSET $3", search.map(|s| format!("%{}%", s)), page_size, ((page - 1) * page_size)
+        "SELECT u.id, u.username, u.name, u.email, u.user_type_id, u.account_status_id, u.status_id, u.is_online, u.created_at, u.updated_at, 
+        cu.username as created_by_username, uu.username as updated_by_username 
+        FROM users u LEFT JOIN users cu ON cu.id = u.created_by LEFT JOIN users uu ON uu.id = u.updated_by 
+        WHERE ($1::text IS NULL OR u.username ILIKE $1 OR u.email ILIKE $1) ORDER BY id LIMIT $2 OFFSET $3", search.map(|s| format!("%{}%", s)), page_size, ((page - 1) * page_size)
     )
     .fetch_all(&pool)
     .await
@@ -236,17 +276,21 @@ pub async fn get_user(
     let pool = data.db.to_owned();
 
     let user = sqlx::query_as!(
-        User,
-        "SELECT id, username, name, email, bio_info, user_type_id, account_status_id,
-                status_id, is_online, show_name_choice_id, theme_id, theme_dark_mode,
-                light_theme_primary_colour, light_theme_secondary_colour,
-                light_theme_accent_colour, light_theme_sent_colour,
-                light_theme_received_colour, light_theme_dark_text_colour,
-                light_theme_light_text_colour, dark_theme_primary_colour,
-                dark_theme_secondary_colour, dark_theme_accent_colour,
-                dark_theme_sent_colour, dark_theme_received_colour,
-                dark_theme_dark_text_colour, dark_theme_light_text_colour
-         FROM users WHERE id = $1",
+        UserInfo,
+        "SELECT u.id, u.username, u.name, u.email, u.bio_info, u.user_type_id, u.account_status_id,
+                u.status_id, u.is_online, u.show_name_choice_id, u.theme_id, u.theme_dark_mode,
+                u.light_theme_primary_colour, u.light_theme_secondary_colour,
+                u.light_theme_accent_colour, u.light_theme_sent_colour,
+                u.light_theme_received_colour, u.light_theme_dark_text_colour,
+                u.light_theme_light_text_colour, u.dark_theme_primary_colour,
+                u.dark_theme_secondary_colour, u.dark_theme_accent_colour,
+                u.dark_theme_sent_colour, u.dark_theme_received_colour,
+                u.dark_theme_dark_text_colour, u.dark_theme_light_text_colour,
+                u.created_at, u.updated_at,
+                cu.username as created_by_username,
+                uu.username as updated_by_username
+         FROM users u LEFT JOIN users cu ON cu.id = u.created_by LEFT JOIN users uu ON uu.id = u.updated_by
+         WHERE u.id = $1",
         id
     )
     .fetch_optional(&pool)

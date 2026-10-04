@@ -6,10 +6,11 @@ import LoginForm from '../auth/LoginForm';
 import Logout from '../auth/Logout';
 import TopBar from './TopBar';
 import SideBar from './SideBar';
-import ManageUsers from '../users/ManageUsers';
+import ManageUsers from "../manage-users/ManageUsers";
 import DirectMessages from '../directmessages/DirectMessages';
-import ChatGroups from '../chatgroups/ChatGroups';
-import Relationships from '../relationships/Relationships';
+import ChatGroup from "../chatgroups/ChatGroup";
+import RelationshipPage from "../relationships/RelationshipPage";
+import FindFriends from "../relationships/FindFriends";
 import Profile from '../profile/Profile';
 
 function Layout() {
@@ -56,8 +57,8 @@ function Layout() {
                         <Routes>
                             <Route path="/" element={<Navigate to="/direct-messages" />} />
                             <Route path="/direct-messages" element={<DirectMessages />} />
-                            <Route path="/chat-groups" element={<ChatGroups />} />
-                            <Route path="/relationships" element={<Relationships />} />
+                            <Route path="/chat-groups" element={<ChatGroup />} />
+                            <Route path="/relationships" element={<RelationshipPage />} />
                             <Route path="/profile" element={<Profile />} />
                             {sessionUser.user_type_id <= 2 && (
                                 <Route path="/manage-users" element={<ManageUsers />} />
@@ -79,9 +80,9 @@ function Layout() {
                 <Routes>
                     <Route path="/" element={<Navigate to="/direct-messages" />} />
                     <Route path="/direct-messages" element={<DirectMessages />} />
-                    <Route path="/chat-groups" element={<ChatGroups />} />
+                    <Route path="/chat-groups" element={<ChatGroup />} />
                     <Route path="/find-friends" element={<FindFriends />} />
-                    <Route path="/relationships" element={<Relationships />} />
+                    <Route path="/relationship" element={<RelationshipPage />} />
                     <Route path="/profile" element={<Profile />} />
                     {sessionUser.user_type_id <= 2 && (
                         <Route path="/manage-users" element={<ManageUsers />} />

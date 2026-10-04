@@ -1,4 +1,3 @@
-import type { GroupPermission, GroupMember } from '../types/group';
 import type { Message } from '../types/message';
 import type { User } from '../types/user';
 import GroupMessageViewHolder from './GroupMessageViewHolder';
@@ -54,7 +53,7 @@ function GroupMessageList({
         <>
             <div className="group-message-list" ref={messageListRef} onScroll={(e) => handleScroll(e)}>
                 {loadingMore ? (<> <p className='group-message-list-loading'> Loading More Messages...</p></>) : (<></>)}
-                {hasMore ? (<> <p className='group-message-list-end'> No More Messages</p></>) : (<></>)}
+                {!hasMore ? (<> <p className='group-message-list-end'> No More Messages</p></>) : (<></>)}
 
                 {messages.map(message => (
                     <GroupMessageViewHolder

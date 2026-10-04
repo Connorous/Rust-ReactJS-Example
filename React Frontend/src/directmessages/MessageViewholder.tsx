@@ -25,7 +25,7 @@ function MessageViewHolder({ message, sessionUser, relationshipId, getMessages }
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [updateError, setUpdateError] = useState('');
     const [updateLoading, setUpdateLoading] = useState(false);
-    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [, setDeleteLoading] = useState(false);
 
     function formatDate(dateStr: string): string {
         const date = new Date(dateStr);
@@ -105,7 +105,7 @@ function MessageViewHolder({ message, sessionUser, relationshipId, getMessages }
 
     return (
         <>
-            <div className={isOwn ? 'message-holder message-own' : 'message-holder message-other'}>
+            <div id={'message=${message.id}'} className={isOwn ? 'message-holder message-own' : 'message-holder message-other'}>
 
                 {mode === 0 ? (
                     <>

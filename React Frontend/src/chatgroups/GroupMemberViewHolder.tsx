@@ -1,66 +1,22 @@
-import type { GroupPermission } from '../types/group';
+import { useState, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
+import ConfirmModal from '../shared/ConfirmModel';
+import type { GroupPermissionRow, GroupMember } from '../types/group';
 import type { User } from '../types/user';
 import './chatGroups.css';
 
-interface GroupMemberListProps {
-    members: GroupPermission[];
-    groupId: number;
-    sessionUser: User;
-    groupPermission: GroupPermission;
-    onMembersUpdated: () => void;
-}
-
-function GroupMemberList({
-    members,
-    groupId,
-    sessionUser,
-    groupPermission,
-    onMembersUpdated,
-}: GroupMemberListProps) {
-    if (members.length === 0) {
-        return (
-            <>
-                <p className="group-info-empty">No members found</p>
-            </>
-        );
-    }
-
-    return (
-        <>
-            <div className="group-member-list">
-                {members.map(member => (
-                    <GroupMemberViewHolder
-                        key={member.id}
-                        member={member}
-                        groupId={groupId}
-                        sessionUser={sessionUser}
-                        groupPermission={groupPermission}
-                        onMembersUpdated={onMembersUpdated}
-                    />
-                ))}
-            </div>
-        </>
-    );
-}
-
-export default GroupMemberList;
-import { useState, useContext } from 'react';
-import { AuthContext } from '../../context/AuthContext';
-import ConfirmModal from '../shared/ConfirmModal';
-import type { GroupPermission } from '../../types/group';
-import type { User } from '../../types/user';
-import './chatGroups.css';
-
 interface GroupMemberViewHolderProps {
-    member: GroupPermission;
+    member: GroupMember;
+    permission: GroupPermissionRow | null;
     groupId: number;
     sessionUser: User;
-    groupPermission: GroupPermission;
+    groupPermission: GroupPermissionRow;
     onMembersUpdated: () => void;
 }
 
 function GroupMemberViewHolder({
     member,
+    permission,
     groupId,
     sessionUser,
     groupPermission,
@@ -68,16 +24,29 @@ function GroupMemberViewHolder({
 }: GroupMemberViewHolderProps) {
     const { accessToken, API_URL, groupPermissionTypes } = useContext(AuthContext);
 
-    const [selectedPermission, setSelectedPermission] = useState(member.permission_type_id);
+    // 0 = view, 1 = update
+    const [mode, setMode] = useState(0);
+    const [selectedPermission, setSelectedPermission] = useState(getMemberPermissionTypeId());
+    var sp = selectedPermission;
     const [showRemoveModal, setShowRemoveModal] = useState(false);
     const [updateLoading, setUpdateLoading] = useState(false);
-    const [removeLoading, setRemoveLoading] = useState(false);
+    const [, setRemoveLoading] = useState(false);
     const [error, setError] = useState('');
 
     const isOwnerOrAdmin = sessionUser.user_type_id <= 2 || groupPermission.permission_type_id === 1;
     const isModerator = groupPermission.permission_type_id <= 2;
     const canManage = isOwnerOrAdmin || isModerator;
-    const isSelf = member.user_id === sessionUser.id;
+    const isSelf = member.id === sessionUser.id;
+
+    function getMemberPermissionTypeId(): number {
+        if (!permission) return 3;
+        return permission.permission_type_id;
+    }
+
+    function getMemberUpdatedByUsername(): string {
+        if (!permission) return 'Unknown';
+        return permission.updated_by_username;
+    }
 
     function getPermissionName(permissionTypeId: number): string {
         var name: string = 'Unknown';
@@ -105,7 +74,7 @@ function GroupMemberViewHolder({
                 },
                 body: JSON.stringify({
                     group_id: groupId,
-                    user_id: member.user_id,
+                    user_id: member.id,
                     permission_type_id: selectedPermission,
                 }),
             });
@@ -113,6 +82,7 @@ function GroupMemberViewHolder({
             const data = await res.json();
 
             if (data.success === true) {
+                setMode(0);
                 onMembersUpdated();
             } else {
                 setError(data.msg);
@@ -136,7 +106,7 @@ function GroupMemberViewHolder({
                 },
                 body: JSON.stringify({
                     group_id: groupId,
-                    user_id: member.user_id,
+                    user_id: member.id,
                 }),
             });
 
@@ -157,49 +127,92 @@ function GroupMemberViewHolder({
 
     return (
         <>
-            <div className="group-member-row">
-                <span className="group-member-name">
-                    @{member.user_id}
-                </span>
+            <div className="group-member-item">
 
-                {canManage && !isSelf ? (
+                {mode === 0 ? (
                     <>
-                        <select
-                            className="group-member-select"
-                            value={selectedPermission}
-                            onChange={(e) => setSelectedPermission(Number(e.target.value))}
-                        >
-                            {groupPermissionTypes.map(type => (
-                                <option key={type.id} value={type.id}>
-                                    {type.permission_type}
-                                </option>
-                            ))}
-                        </select>
-                        <button
-                            className="group-member-update-btn"
-                            onClick={() => updatePermission()}
-                            disabled={updateLoading}
-                        >
-                            {updateLoading ? '...' : 'Update'}
-                        </button>
-                        <button
-                            className="group-member-remove-btn"
-                            onClick={() => setShowRemoveModal(true)}
-                        >
-                            Remove
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        <span className="group-member-permission">
-                            {getPermissionName(member.permission_type_id)}
+                        <div className="group-member-row">
+                            <span className="group-member-name">@{member.username}</span>
+                            <span className="group-member-permission">
+                                {getPermissionName(getMemberPermissionTypeId())}
+                            </span>
+                            {canManage && !isSelf ? (
+                                <>
+                                    <button
+                                        className="group-member-update-btn"
+                                        onClick={() => {
+                                            setSelectedPermission(getMemberPermissionTypeId());
+                                            sp = getMemberPermissionTypeId();
+                                            setMode(1);
+                                        }}
+                                    >
+                                        Update
+                                    </button>
+                                    <button
+                                        className="group-member-remove-btn"
+                                        onClick={() => setShowRemoveModal(true)}
+                                    >
+                                        Remove
+                                    </button>
+                                </>
+                            ) : (
+                                <></>
+                            )}
+                        </div>
+                        <span className="group-member-updated-by">
+                            Updated by @{getMemberUpdatedByUsername()}
                         </span>
                     </>
+                ) : (
+                    <></>
                 )}
 
-                {error !== '' ? (
+                {mode === 1 ? (
                     <>
-                        <p className="group-info-error">{error}</p>
+                        <div className="group-member-update-row">
+                            <span className="group-member-name">@{member.username}</span>
+                            <select
+                                className="group-member-select"
+                                value={sp}
+                                onChange={(e) => {
+                                    setSelectedPermission(Number(e.target.value));
+                                    sp = Number(e.target.value);
+                                }}
+                            >
+                                {groupPermissionTypes.map(type => (
+                                    <option key={type.id} value={type.id}>
+                                        {type.permission_type}
+                                    </option>
+                                ))}
+                            </select>
+                            {error !== '' ? (
+                                <>
+                                    <p className="group-info-error">{error}</p>
+                                </>
+                            ) : (
+                                <></>
+                            )}
+                            <div className="group-member-update-btns">
+                                <button
+                                    className="group-member-save-btn"
+                                    onClick={() => updatePermission()}
+                                    disabled={updateLoading}
+                                >
+                                    {updateLoading ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                    className="group-member-discard-btn"
+                                    onClick={() => {
+                                        setSelectedPermission(getMemberPermissionTypeId());
+                                        sp = getMemberPermissionTypeId();
+                                        setMode(0);
+                                        setError('');
+                                    }}
+                                >
+                                    Discard
+                                </button>
+                            </div>
+                        </div>
                     </>
                 ) : (
                     <></>
@@ -208,7 +221,7 @@ function GroupMemberViewHolder({
                 {showRemoveModal ? (
                     <>
                         <ConfirmModal
-                            message="Are you sure you want to remove this member?"
+                            message={`Are you sure you want to remove @${member.username} from this group?`}
                             onConfirm={() => removeMember()}
                             onCancel={() => setShowRemoveModal(false)}
                         />
@@ -216,6 +229,7 @@ function GroupMemberViewHolder({
                 ) : (
                     <></>
                 )}
+
             </div>
         </>
     );

@@ -126,7 +126,7 @@ pub async fn list_account_status_types(
 
 pub async fn get_user(
     data: web::Data<AppState>,
-    claims: RequireUserType<{ user_type::VIEWER }, { errors::GET_USER }>,
+    claims: RequireUserType<{ user_type::ADMIN }, { errors::GET_USER }>,
     json: web::Json<GetUserRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -192,7 +192,7 @@ pub async fn update_user(
 
 pub async fn update_profile(
     data: web::Data<AppState>,
-    claims: RequireUserType<{ user_type::VIEWER }, { errors::UPDATE_PROFILE }>,
+    claims: RequireUserType<{ user_type::STANDARD_USER }, { errors::UPDATE_PROFILE }>,
     json: web::Json<UpdateProfileRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();
@@ -207,7 +207,7 @@ pub async fn update_profile(
 
 pub async fn update_status(
     data: web::Data<AppState>,
-    claims: RequireUserType<{ user_type::VIEWER }, { errors::UPDATE_STATUS }>,
+    claims: RequireUserType<{ user_type::STANDARD_USER }, { errors::UPDATE_STATUS }>,
     json: web::Json<UpdateStatusRequestBody>,
 ) -> HttpResponse {
     let body = json.clone();

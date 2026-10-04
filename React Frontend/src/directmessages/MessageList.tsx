@@ -40,7 +40,7 @@ function MessageList({ messages, sessionUser, relationshipId, getMessages: getMe
         <>
             <div className="message-list" ref={messageListRef} onScroll={(e) => handleScroll(e)}>
                 {loadingMore ? (<> <p className='message-list-loading'> Loading More Messages...</p></>) : (<></>)}
-                {hasMore ? (<> <p className='message-list-end'> No More Messages</p></>) : (<></>)}
+                {!hasMore ? (<> <p className='message-list-end'> No More Messages</p></>) : (<></>)}
 
                 {messages.map(message => (
                     <MessageViewHolder

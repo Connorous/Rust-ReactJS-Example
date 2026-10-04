@@ -2,18 +2,20 @@ import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useWSEvent } from '../hooks/useWSEvent';
 import ConfirmModal from '../shared/ConfirmModel';
-//import GroupMemberList from './GroupMemberViewHolder';
-import type { Group, GroupPermission, GroupMember } from '../types/group';
+import GroupMemberList from './GroupMemberList';
+import type { Group, GroupPermissionRow, GroupMember } from '../types/group';
 import type { User } from '../types/user';
+import type { Message } from '../types/message';
 import type { ApiResponse } from '../types/api';
 import './chatGroups.css';
 
 interface GroupInfoPanelProps {
     group: Group;
-    groupPermission: GroupPermission;
+    groupPermission: GroupPermissionRow;
     sessionUser: User;
     onGroupUpdated: () => void;
     onClose: () => void;
+    scrollToMessage: (id: number) => void;
 }
 
 function GroupInfoPanel({
@@ -22,6 +24,7 @@ function GroupInfoPanel({
     sessionUser,
     onGroupUpdated,
     onClose,
+    scrollToMessage,
 }: GroupInfoPanelProps) {
     const { accessToken, API_URL } = useContext(AuthContext);
 
@@ -29,18 +32,32 @@ function GroupInfoPanel({
     var gn = groupName;
 
     const [members, setMembers] = useState<GroupMember[]>([]);
-    const [permissions, setPermissions] = useState<GroupPermission[]>([]);
+    const [permissions, setPermissions] = useState<GroupPermissionRow[]>([]);
     const [nonMembers, setNonMembers] = useState<User[]>([]);
 
     var [searchTerm, setSearchTerm] = useState('');
     var st = searchTerm;
 
+    var [messageSearch, setMessageSearch] = useState('');
+    var ms = messageSearch;
+
     const [nameError, setNameError] = useState('');
     const [nameSuccess, setNameSuccess] = useState('');
     const [nameLoading, setNameLoading] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [, setDeleteLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Collapsible sections — details and members open by default, search closed
+    const [detailsExpanded, setDetailsExpanded] = useState(true);
+    const [membersExpanded, setMembersExpanded] = useState(true);
+    const [searchExpanded, setSearchExpanded] = useState(false);
+
+    // Message search results
+    const [searchResults, setSearchResults] = useState<Message[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+
+    const searchTimeoutRef = useState<ReturnType<typeof setTimeout> | null>(null);
 
     const isOwnerOrAdmin = sessionUser.user_type_id <= 2 || groupPermission.permission_type_id === 1;
 
@@ -98,7 +115,7 @@ function GroupInfoPanel({
                 body: JSON.stringify({ group_id: group.id }),
             });
 
-            const data: ApiResponse<GroupPermission[]> = await res.json();
+            const data: ApiResponse<GroupPermissionRow[]> = await res.json();
 
             if (data.success === true) {
                 setPermissions(data.data!);
@@ -237,6 +254,62 @@ function GroupInfoPanel({
         setShowDeleteModal(false);
     }
 
+    function handleMessageSearchChange(value: string) {
+        setMessageSearch(value);
+        ms = value;
+
+        if (searchTimeoutRef[0]) {
+            clearTimeout(searchTimeoutRef[0]);
+        }
+
+        if (value.trim().length < 2) {
+            setSearchResults([]);
+            return;
+        }
+
+        // @ts-ignore
+        searchTimeoutRef[0] = setTimeout(() => {
+            searchMessages(value);
+        }, 300);
+    }
+
+    function searchMessages(term: string) {
+        // Frontend search — filters already loaded messages passed via prop
+        // We'll need messages passed down — for now search via backend
+        setSearchLoading(true);
+
+        fetch(`${API_URL}groups/search-messages`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                group_id: group.id,
+                search_term: term,
+            }),
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success === true) {
+                    setSearchResults(data.data!);
+                } else if (data.empty === true) {
+                    setSearchResults([]);
+                }
+            })
+            .catch(() => {
+                console.log('Failed to search messages');
+            })
+            .finally(() => {
+                setSearchLoading(false);
+            });
+    }
+
+    function formatDate(dateStr: string): string {
+        var date = new Date(dateStr);
+        return date.toLocaleString();
+    }
+
     return (
         <>
             <div className="group-info-panel">
@@ -250,105 +323,181 @@ function GroupInfoPanel({
                     </button>
                 </div>
 
+                {/* Group Details — collapsible */}
                 {isOwnerOrAdmin ? (
                     <>
+                        <div
+                            className="group-info-section-header"
+                            onClick={() => setDetailsExpanded(!detailsExpanded)}
+                        >
+                            <h4 className="group-info-section-title">Group Details</h4>
+                            <span>{detailsExpanded ? '▲' : '▼'}</span>
+                        </div>
+
+                        {detailsExpanded ? (
+                            <>
+                                <div className="group-info-section">
+                                    <input
+                                        className="group-info-input"
+                                        type="text"
+                                        value={gn}
+                                        onChange={(e) => {
+                                            setGroupName(e.target.value);
+                                            gn = e.target.value;
+                                        }}
+                                    />
+                                    {nameError !== '' ? (
+                                        <>
+                                            <p className="group-info-error">{nameError}</p>
+                                        </>
+                                    ) : (
+                                        <></>
+                                    )}
+                                    {nameSuccess !== '' ? (
+                                        <>
+                                            <p className="group-info-success">{nameSuccess}</p>
+                                        </>
+                                    ) : (
+                                        <></>
+                                    )}
+                                    <button
+                                        className="group-info-save-btn"
+                                        onClick={() => updateGroupName()}
+                                        disabled={nameLoading}
+                                    >
+                                        {nameLoading ? 'Saving...' : 'Save Name'}
+                                    </button>
+
+                                    <button
+                                        className="group-delete-btn"
+                                        onClick={() => setShowDeleteModal(true)}
+                                    >
+                                        Delete Group
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <></>
+                        )}
+                    </>
+                ) : (
+                    <></>
+                )}
+
+                {/* Members — collapsible */}
+                <div
+                    className="group-info-section-header"
+                    onClick={() => setMembersExpanded(!membersExpanded)}
+                >
+                    <h4 className="group-info-section-title">Members</h4>
+                    <span>{membersExpanded ? '▲' : '▼'}</span>
+                </div>
+
+                {membersExpanded ? (
+                    <>
                         <div className="group-info-section">
-                            <h4 className="group-info-section-title">Group Name</h4>
-                            <input
-                                className="group-info-input"
-                                type="text"
-                                value={gn}
-                                onChange={(e) => {
-                                    setGroupName(e.target.value);
-                                    gn = e.target.value;
+                            <GroupMemberList
+                                members={members}
+                                permissions={permissions}
+                                groupId={group.id}
+                                sessionUser={sessionUser}
+                                groupPermission={groupPermission}
+                                onMembersUpdated={() => {
+                                    fetchMembers();
+                                    fetchPermissions();
+                                    fetchNonMembers();
                                 }}
                             />
-                            {nameError !== '' ? (
+
+                            {isOwnerOrAdmin ? (
                                 <>
-                                    <p className="group-info-error">{nameError}</p>
+                                    <h4 className="group-info-section-title">Add Members</h4>
+                                    <input
+                                        className="group-info-input"
+                                        type="text"
+                                        placeholder="Search by username..."
+                                        value={st}
+                                        onChange={(e) => {
+                                            setSearchTerm(e.target.value);
+                                            st = e.target.value;
+                                        }}
+                                    />
+                                    <div className="group-info-non-members">
+                                        {getFilteredNonMembers().map(user => (
+                                            <div key={user.id} className="group-non-member-row">
+                                                <span className="group-non-member-name">@{user.username}</span>
+                                                <button
+                                                    className="group-add-btn"
+                                                    onClick={() => addMember(user.id)}
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </>
                             ) : (
                                 <></>
                             )}
-                            {nameSuccess !== '' ? (
-                                <>
-                                    <p className="group-info-success">{nameSuccess}</p>
-                                </>
-                            ) : (
-                                <></>
-                            )}
-                            <button
-                                className="group-info-save-btn"
-                                onClick={() => updateGroupName()}
-                                disabled={nameLoading}
-                            >
-                                {nameLoading ? 'Saving...' : 'Save Name'}
-                            </button>
                         </div>
                     </>
                 ) : (
                     <></>
                 )}
 
-                <div className="group-info-section">
-                    <h4 className="group-info-section-title">Members</h4>
-                    <GroupMemberList
-                        members={members}
-                        permissions={permissions}
-                        groupId={group.id}
-                        sessionUser={sessionUser}
-                        groupPermission={groupPermission}
-                        onMembersUpdated={() => {
-                            fetchMembers();
-                            fetchPermissions();
-                            fetchNonMembers();
-                        }}
-                    />
+                {/* Message Search — collapsible, closed by default */}
+                <div
+                    className="group-info-section-header"
+                    onClick={() => setSearchExpanded(!searchExpanded)}
+                >
+                    <h4 className="group-info-section-title">Message Search</h4>
+                    <span>{searchExpanded ? '▲' : '▼'}</span>
                 </div>
 
-                <div className="group-info-section">
-                    <h4 className="group-info-section-title">Add Members</h4>
-                    <input
-                        className="group-info-input"
-                        type="text"
-                        placeholder="Search by username..."
-                        value={st}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            st = e.target.value;
-                        }}
-                    />
-                    <div className="group-info-non-members">
-                        {getFilteredNonMembers().map(user => (
-                            <div key={user.id} className="group-non-member-row">
-                                <span className="group-non-member-name">@{user.username}</span>
-                                <button
-                                    className="group-add-btn"
-                                    onClick={() => addMember(user.id)}
-                                >
-                                    Add
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {error !== '' ? (
+                {searchExpanded ? (
                     <>
-                        <p className="group-info-error">{error}</p>
+                        <div className="group-info-section">
+                            <input
+                                className="group-info-input"
+                                type="text"
+                                placeholder="Search messages... (min 2 chars)"
+                                value={ms}
+                                onChange={(e) => handleMessageSearchChange(e.target.value)}
+                            />
+
+                            {searchLoading ? (
+                                <>
+                                    <p className="group-info-search-loading">Searching...</p>
+                                </>
+                            ) : (
+                                <></>
+                            )}
+
+                            {searchResults.length === 0 && ms.trim().length >= 2 && !searchLoading ? (
+                                <>
+                                    <p className="group-info-empty">No messages found</p>
+                                </>
+                            ) : (
+                                <></>
+                            )}
+
+                            <div className="group-info-search-results">
+                                {searchResults.map(result => (
+                                    <div key={result.id} className="group-info-search-result" onClick={() => scrollToMessage(result.id)}>
+                                        <p className="group-info-search-message">{result.message}</p>
+                                        <p className="group-info-search-time">{formatDate(result.created_at)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </>
                 ) : (
                     <></>
                 )}
 
-                {isOwnerOrAdmin ? (
+                {error !== '' ? (
                     <>
-                        <button
-                            className="group-delete-btn"
-                            onClick={() => setShowDeleteModal(true)}
-                        >
-                            Delete Group
-                        </button>
+                        <p className="group-info-error">{error}</p>
                     </>
                 ) : (
                     <></>
